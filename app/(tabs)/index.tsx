@@ -1,342 +1,488 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Dimensions,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
-  View
+  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import Card from '../../src/components/ui/Card';
-import SectionHeader from '../../src/components/ui/SectionHeader';
-import TagPill from '../../src/components/ui/TagPill';
 import { events } from '../../src/data/events';
-import { restaurants } from '../../src/data/food';
-import { campusAlerts, quickActions } from '../../src/data/homeData';
-import { Colors, Gradients, Radius, Shadows, Spacing, Typography } from '../../src/theme';
+import { campusAlerts } from '../../src/data/homeData';
+import { Colors, Radius, Shadows, Spacing, Typography } from '../../src/theme';
 
 const { width: SW } = Dimensions.get('window');
-const CARD_W = SW * 0.88;
+const CARD_GAP = 12;
+const CARD_SIZE = (SW - Spacing.section * 2 - CARD_GAP) / 2;
 
-const ACTION_GRADIENTS: Record<string, string[]> = {
-  food: Gradients.food,
-  events: Gradients.events,
-  map: Gradients.map,
-  academics: Gradients.academics,
-  challenge: Gradients.accent,
-  teachers: ['#FF6B6B', '#FF3B30'],
-};
+// ─── Service cards (Swiggy-style 2×2 grid) ───────────────────────────────────
+const SERVICE_CARDS = [
+  {
+    id: 'food',
+    title: 'FOOD',
+    subtitle: 'ORDER FROM CAMPUS',
+    badge: '3 counters',
+    emoji: '🍱',
+    bg: '#FFF3E8',
+    badgeBg: '#FF6B35',
+    route: '/(tabs)/food',
+  },
+  {
+    id: 'events',
+    title: 'EVENTS',
+    subtitle: 'WHAT\'S HAPPENING',
+    badge: '5 this week',
+    emoji: '🎟️',
+    bg: '#EEF2FF',
+    badgeBg: '#6C63FF',
+    route: '/(tabs)/events',
+  },
+  {
+    id: 'academics',
+    title: 'ACADEMICS',
+    subtitle: 'YOUR GRADES & CGPA',
+    badge: 'CGPA: 8.4',
+    emoji: '📚',
+    bg: '#EDFBF3',
+    badgeBg: '#22C55E',
+    route: '/(tabs)/academics',
+  },
+  {
+    id: 'coding',
+    title: 'CODING',
+    subtitle: 'DAILY CHALLENGE',
+    badge: '🔥 14-day streak',
+    emoji: '💻',
+    bg: '#F0EEFF',
+    badgeBg: '#7C3AED',
+    route: '/coding-challenge',
+  },
+  {
+    id: 'faculty',
+    title: 'FACULTY',
+    subtitle: 'CONNECT WITH TEACHERS',
+    badge: 'Quick access',
+    emoji: '👩‍🏫',
+    bg: '#FFF0F5',
+    badgeBg: '#F43F5E',
+    route: '/teachers',
+  },
+  {
+    id: 'map',
+    title: 'CAMPUS MAP',
+    subtitle: 'FIND YOUR WAY',
+    badge: 'Navigate',
+    emoji: '🗺️',
+    bg: '#F0FAFB',
+    badgeBg: '#0891B2',
+    route: '/campus-map',
+  },
+];
+
+function greeting() {
+  const h = new Date().getHours();
+  if (h < 12) return 'Good morning';
+  if (h < 17) return 'Good afternoon';
+  return 'Good evening';
+}
+
+// ─── Component ────────────────────────────────────────────────────────────────
 
 export default function HomeScreen() {
-  const todayEvents = events.slice(0, 4);
-  const nearbyRests = restaurants.slice(0, 3);
+  const [search, setSearch] = useState('');
+
+  const searchLower = search.trim().toLowerCase();
+
+  const filteredEvents = events.filter((e) =>
+    searchLower === '' || e.title.toLowerCase().includes(searchLower) || e.category.toLowerCase().includes(searchLower)
+  ).slice(0, 5);
+
+  const filteredCards = SERVICE_CARDS.filter((c) =>
+    searchLower === '' || c.title.toLowerCase().includes(searchLower) || c.subtitle.toLowerCase().includes(searchLower)
+  );
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
+      {/* ═══ BLINKIT-STYLE HEADER ═══ */}
+      <View style={styles.header}>
+        <View style={styles.headerLeft}>
+          <TouchableOpacity style={styles.locationRow}>
+            <Ionicons name="location" size={16} color={Colors.primary} />
+            <Text style={styles.locationText}>Main Campus</Text>
+            <Ionicons name="chevron-down" size={14} color={Colors.text} />
+          </TouchableOpacity>
+          <Text style={styles.greeting}>{greeting()}, Yugan 👋</Text>
+        </View>
+        <TouchableOpacity style={styles.avatarBtn}>
+          <Ionicons name="person" size={22} color={Colors.textSecondary} />
+        </TouchableOpacity>
+      </View>
+
+      {/* ═══ BLINKIT-STYLE SEARCH BAR ═══ */}
+      <View style={styles.searchWrap}>
+        <View style={styles.searchBar}>
+          <Ionicons name="search" size={18} color={Colors.textTertiary} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search for food, events, faculty…"
+            placeholderTextColor={Colors.textTertiary}
+            value={search}
+            onChangeText={setSearch}
+          />
+          <Ionicons name="mic" size={18} color={Colors.primary} />
+        </View>
+      </View>
+
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scroll}
       >
-        {/* ═══ HEADER ═══ */}
-        <View style={styles.header}>
-          <View style={styles.headerLeft}>
-            <View style={styles.locationRow}>
-              <Ionicons name="location" size={14} color={Colors.primary} />
-              <Text style={styles.locationText}>Main Campus</Text>
-              <Ionicons name="chevron-down" size={12} color={Colors.textSecondary} />
-            </View>
-            <Text style={styles.greeting}>Good evening, Yugan 👋</Text>
+        {/* ═══ PROMO BANNER (Blinkit ₹50 OFF style) ═══ */}
+        <View style={styles.promoBanner}>
+          <View style={styles.promoLeft}>
+            <Text style={styles.promoSmall}>TODAY'S HIGHLIGHT</Text>
+            <Text style={styles.promoTitle}>HackMIT{'\n'}This Weekend 🚀</Text>
+            <TouchableOpacity
+              style={styles.promoCta}
+              onPress={() => router.push('/(tabs)/events')}
+            >
+              <Text style={styles.promoCtaText}>REGISTER NOW</Text>
+            </TouchableOpacity>
           </View>
-          <TouchableOpacity style={styles.notifBtn} activeOpacity={0.88}>
-            <Ionicons name="notifications-outline" size={22} color={Colors.text} />
-            <View style={styles.notifDot} />
-          </TouchableOpacity>
+          <Text style={styles.promoEmoji}>🏆</Text>
         </View>
 
         {/* ═══ CAMPUS ALERTS ═══ */}
         {campusAlerts.map((alert) => (
-          <View key={alert.id} style={styles.alertBanner}>
+          <TouchableOpacity key={alert.id} style={styles.alertRow} activeOpacity={0.85}>
             <Text style={styles.alertEmoji}>{alert.emoji}</Text>
-            <View style={styles.alertBody}>
+            <View style={styles.alertText}>
               <Text style={styles.alertTitle}>{alert.title}</Text>
-              <Text style={styles.alertDesc} numberOfLines={1}>{alert.description}</Text>
+              <Text style={styles.alertDesc}>{alert.description}</Text>
             </View>
-            <Ionicons name="chevron-forward" size={14} color={Colors.primary} />
-          </View>
+            <Ionicons name="chevron-forward" size={16} color={Colors.primary} />
+          </TouchableOpacity>
         ))}
 
-        {/* ═══ QUICK ACTIONS ═══ */}
-        <View style={styles.actionsWrap}>
-          {quickActions.map((action) => {
-            const grad = ACTION_GRADIENTS[action.id] ?? Gradients.primary;
-            return (
-              <TouchableOpacity
-                key={action.id}
-                style={styles.actionItem}
-                activeOpacity={0.88}
-                onPress={() => action.route && router.push(action.route as any)}
-              >
-                {/* Gradient circle */}
-                <View style={[styles.actionCircle, { backgroundColor: grad[0] }]}>
-                  <Text style={styles.actionEmoji}>{action.emoji}</Text>
-                </View>
-                <Text style={styles.actionLabel}>{action.label}</Text>
+        {/* ═══ SWIGGY-STYLE SERVICES GRID ═══ */}
+        {filteredCards.length > 0 && (
+          <>
+            <Text style={styles.sectionTitle}>What would you like?</Text>
+            <View style={styles.grid}>
+              {filteredCards.map((card) => (
+                <TouchableOpacity
+                  key={card.id}
+                  style={[styles.card, { backgroundColor: card.bg }]}
+                  activeOpacity={0.88}
+                  onPress={() => router.push(card.route as any)}
+                >
+                  <View>
+                    <Text style={styles.cardTitle}>{card.title}</Text>
+                    <Text style={styles.cardSubtitle}>{card.subtitle}</Text>
+                    <View style={[styles.cardBadge, { backgroundColor: card.badgeBg }]}>
+                      <Text style={styles.cardBadgeText}>{card.badge}</Text>
+                    </View>
+                  </View>
+                  <Text style={styles.cardEmoji}>{card.emoji}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </>
+        )}
+
+        {/* ═══ UPCOMING EVENTS (horizontal strip) ═══ */}
+        {filteredEvents.length > 0 && (
+          <>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Events Near You</Text>
+              <TouchableOpacity onPress={() => router.push('/(tabs)/events')}>
+                <Text style={styles.seeAll}>See all →</Text>
               </TouchableOpacity>
-            );
-          })}
-        </View>
-
-        {/* ═══ FEATURED EVENTS ═══ */}
-        <View style={styles.sectionSpacer} />
-        <SectionHeader
-          title="Events Near You"
-          subtitle="This week"
-          onSeeAll={() => router.push('/(tabs)/events')}
-        />
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.hScroll}
-          decelerationRate="fast"
-          snapToInterval={CARD_W + 12}
-        >
-          {todayEvents.map((event) => (
-            <TouchableOpacity
-              key={event.id}
-              activeOpacity={0.92}
-              style={[styles.eventCard, { width: CARD_W }]}
-              onPress={() => router.push(`/event/${event.id}` as any)}
+            </View>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.eventStrip}
             >
-              {/* Hero gradient bg */}
-              <View style={[styles.eventHero, { backgroundColor: event.colorBg ?? '#1A1A2E' }]}>
-                <View style={styles.eventOverlay} />
-                {/* Floating chips */}
-                <View style={styles.eventChipRow}>
-                  <TagPill label={event.category} variant="dark" size="sm" />
-                  {event.seatsLeft < 30 && (
-                    <View style={styles.seatsChip}>
-                      <Ionicons name="flash" size={10} color="#FFD60A" />
-                      <Text style={styles.seatsChipText}>{event.seatsLeft} left</Text>
+              {filteredEvents.map((ev) => (
+                <TouchableOpacity
+                  key={ev.id}
+                  style={[styles.eventCard, { backgroundColor: ev.colorBg ?? '#1C1C1E' }]}
+                  activeOpacity={0.88}
+                >
+                  <View style={styles.eventTop}>
+                    <View style={styles.eventCatPill}>
+                      <Text style={styles.eventCatText}>{ev.category}</Text>
                     </View>
-                  )}
-                </View>
-                {/* Bottom text */}
-                <View style={styles.eventCardBottom}>
-                  <Text style={styles.eventCardTitle} numberOfLines={2}>{event.title}</Text>
-                  <View style={styles.eventCardMeta}>
-                    <Ionicons name="calendar-outline" size={12} color="rgba(255,255,255,0.7)" />
-                    <Text style={styles.eventCardMetaText}>{event.date} · {event.time}</Text>
+                    {ev.seatsLeft <= 15 && (
+                      <View style={styles.urgencyPill}>
+                        <Text style={styles.urgencyText}>⚡ {ev.seatsLeft} left</Text>
+                      </View>
+                    )}
                   </View>
-                </View>
-              </View>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-
-        {/* ═══ FOOD NEAR YOU ═══ */}
-        <View style={styles.sectionSpacer} />
-        <SectionHeader
-          title="Food Near You"
-          subtitle="Under 30 min"
-          onSeeAll={() => router.push('/(tabs)/food')}
-        />
-        <View style={styles.foodList}>
-          {nearbyRests.map((rest) => (
-            <TouchableOpacity
-              key={rest.id}
-              activeOpacity={0.88}
-              onPress={() => router.push('/(tabs)/food')}
-            >
-              <Card style={styles.restCard} shadow="sm" padding={0}>
-                {/* Banner */}
-                <View style={[styles.restBanner, { backgroundColor: rest.colorBg ?? '#FF6B35' }]}>
-                  <Text style={styles.restEmoji}>{rest.emoji ?? '🍽️'}</Text>
-                </View>
-                <View style={styles.restInfo}>
-                  <View style={styles.restTopRow}>
-                    <Text style={styles.restName}>{rest.name}</Text>
-                    <View style={styles.restRating}>
-                      <Ionicons name="star" size={12} color={Colors.warning} />
-                      <Text style={styles.ratingText}>{rest.rating}</Text>
-                    </View>
+                  <View style={styles.eventBottom}>
+                    <Text style={styles.eventEmoji}>{ev.emoji ?? '📅'}</Text>
+                    <Text style={styles.eventTitle} numberOfLines={2}>{ev.title}</Text>
+                    <Text style={styles.eventMeta}>📅 {ev.date} · {ev.time}</Text>
                   </View>
-                  <Text style={styles.restMeta}>{rest.cuisine} · {rest.deliveryTime}</Text>
-                </View>
-              </Card>
-            </TouchableOpacity>
-          ))}
-        </View>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </>
+        )}
 
-        {/* ═══ DAILY CHALLENGE BANNER ═══ */}
-        <View style={styles.sectionSpacer} />
+        {/* ═══ CODING STREAK BANNER ═══ */}
         <TouchableOpacity
           style={styles.challengeBanner}
-          activeOpacity={0.88}
+          activeOpacity={0.9}
           onPress={() => router.push('/coding-challenge')}
         >
-          <View style={styles.challengeLeft}>
-            <Text style={styles.challengeLabel}>DAILY CHALLENGE</Text>
-            <Text style={styles.challengeTitle}>Two Sum</Text>
-            <View style={styles.challengeMeta}>
-              <View style={styles.easyBadge}><Text style={styles.easyText}>Easy</Text></View>
-              <Text style={styles.challengeDesc}>🔥 23-day streak</Text>
-            </View>
+          <View>
+            <Text style={styles.challengeLabel}>DAILY CHALLENGE ACTIVE</Text>
+            <Text style={styles.challengeTitle}>🔥 14-Day Streak!</Text>
+            <Text style={styles.challengeSub}>Keep it going — solve today's problem</Text>
           </View>
-          <View style={styles.challengeRight}>
-            <Text style={styles.challengeIcon}>💻</Text>
-            <Text style={styles.challengeCta}>Solve →</Text>
+          <View style={styles.challengeArrow}>
+            <Ionicons name="arrow-forward" size={18} color="#FFF" />
           </View>
         </TouchableOpacity>
-
-        <View style={{ height: 90 }} />
       </ScrollView>
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: Colors.background },
-  scroll: { paddingBottom: Spacing.xl },
+// ─── Styles ──────────────────────────────────────────────────────────────────
 
-  // Header
+const styles = StyleSheet.create({
+  safe: { flex: 1, backgroundColor: '#FFFFFF' },
+
+  // ── Blinkit Header ──
   header: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: Spacing.section,
-    paddingTop: Spacing.md,
-    paddingBottom: Spacing.lg,
-    backgroundColor: '#FFF8F3',
+    paddingTop: Spacing.sm,
+    paddingBottom: Spacing.xs,
   },
   headerLeft: { flex: 1 },
-  locationRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 5 },
-  locationText: { ...Typography.label, color: Colors.textSecondary, fontSize: 12 },
-  greeting: { ...Typography.h1, color: Colors.text },
-  notifBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: Colors.cardBg,
+  locationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginBottom: 2,
+  },
+  locationText: {
+    ...Typography.label,
+    color: Colors.text,
+    fontWeight: '700' as const,
+    fontSize: 15,
+  },
+  greeting: {
+    ...Typography.h2,
+    color: Colors.text,
+    fontSize: 22,
+  },
+  avatarBtn: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: Colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
     ...Shadows.sm,
-    position: 'relative',
-  },
-  notifDot: {
-    position: 'absolute',
-    top: 10,
-    right: 10,
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: Colors.error,
-    borderWidth: 1.5,
-    borderColor: Colors.cardBg,
   },
 
-  // Alert banner
-  alertBanner: {
+  // ── Blinkit Search ──
+  searchWrap: {
+    paddingHorizontal: Spacing.section,
+    paddingBottom: Spacing.md,
+  },
+  searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.primaryLight,
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.xl,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 12,
+    gap: 10,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  searchInput: {
+    flex: 1,
+    ...Typography.body2,
+    color: Colors.text,
+    padding: 0,
+  },
+
+  // ── Scroll content ──
+  scroll: { paddingBottom: 110 },
+
+  // ── Promo banner (Blinkit ₹50 OFF style) ──
+  promoBanner: {
     marginHorizontal: Spacing.section,
+    marginBottom: Spacing.md,
+    borderRadius: Radius.xl,
+    backgroundColor: '#1A5C3A',
+    padding: Spacing.xl,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    overflow: 'hidden',
+  },
+  promoLeft: { flex: 1 },
+  promoSmall: { ...Typography.micro, color: 'rgba(255,255,255,0.65)', letterSpacing: 1.5, marginBottom: 4 },
+  promoTitle: { ...Typography.h3, color: '#FFF', lineHeight: 28, marginBottom: Spacing.md },
+  promoCta: {
+    alignSelf: 'flex-start',
+    backgroundColor: Colors.primary,
+    borderRadius: Radius.pill,
+    paddingHorizontal: 16,
+    paddingVertical: 7,
+  },
+  promoCtaText: { ...Typography.label, color: '#FFF', fontWeight: '700' as const, fontSize: 12 },
+  promoEmoji: { fontSize: 72, marginLeft: Spacing.md },
+
+  // ── Campus Alerts ──
+  alertRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: Spacing.section,
+    marginBottom: Spacing.sm,
+    backgroundColor: '#FFF8F0',
     borderRadius: Radius.lg,
     padding: Spacing.md,
-    marginBottom: Spacing.sm,
-    gap: Spacing.sm,
+    gap: Spacing.md,
     borderWidth: 1,
-    borderColor: 'rgba(252,128,25,0.15)',
+    borderColor: '#FFE8CC',
   },
   alertEmoji: { fontSize: 22 },
-  alertBody: { flex: 1 },
+  alertText: { flex: 1 },
   alertTitle: { ...Typography.h5, color: Colors.text },
-  alertDesc: { ...Typography.caption, color: Colors.textSecondary, marginTop: 1 },
+  alertDesc: { ...Typography.caption, color: Colors.textSecondary, marginTop: 2 },
 
-  // Quick Actions
-  actionsWrap: {
+  // ── Section header ──
+  sectionHeader: {
     flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginHorizontal: Spacing.section,
+    marginTop: Spacing.xl,
+    marginBottom: Spacing.md,
+  },
+  sectionTitle: {
+    ...Typography.h3,
+    color: Colors.text,
+    marginHorizontal: Spacing.section,
+    marginTop: Spacing.xl,
+    marginBottom: Spacing.md,
+  },
+  seeAll: { ...Typography.label, color: Colors.primary, fontWeight: '600' as const },
+
+  // ── Swiggy 2×2 Service Grid ──
+  grid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
     paddingHorizontal: Spacing.section,
-    paddingTop: Spacing.lg,
+    gap: CARD_GAP,
+  },
+  card: {
+    width: CARD_SIZE,
+    height: CARD_SIZE,
+    borderRadius: Radius.xl,
+    padding: Spacing.md,
+    justifyContent: 'space-between',
+    overflow: 'hidden',
+  },
+  cardTitle: {
+    fontSize: 13,
+    fontWeight: '800' as const,
+    color: Colors.text,
+    letterSpacing: 0.5,
+  },
+  cardSubtitle: {
+    ...Typography.micro,
+    color: Colors.textSecondary,
+    marginTop: 2,
+    letterSpacing: 0.3,
+  },
+  cardBadge: {
+    alignSelf: 'flex-start',
+    borderRadius: Radius.pill,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    marginTop: 6,
+  },
+  cardBadgeText: {
+    ...Typography.micro,
+    color: '#FFF',
+    fontWeight: '700' as const,
+  },
+  cardEmoji: {
+    fontSize: 52,
+    alignSelf: 'flex-end',
+    marginBottom: -6,
+    marginRight: -4,
+  },
+
+  // ── Event horizontal strip ──
+  eventStrip: {
+    paddingHorizontal: Spacing.section,
+    gap: 12,
+  },
+  eventCard: {
+    width: 200,
+    height: 160,
+    borderRadius: Radius.xl,
+    padding: Spacing.md,
     justifyContent: 'space-between',
   },
-  actionItem: { alignItems: 'center', gap: 8, flex: 1 },
-  actionCircle: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    alignItems: 'center',
-    justifyContent: 'center',
-    ...Shadows.md,
+  eventTop: { flexDirection: 'row', gap: 8, alignItems: 'center' },
+  eventCatPill: {
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    borderRadius: Radius.pill,
+    paddingHorizontal: 10,
+    paddingVertical: 3,
   },
-  actionEmoji: { fontSize: 24 },
-  actionLabel: { ...Typography.micro, color: Colors.textSecondary, textAlign: 'center' },
-
-  // Events carousel
-  sectionSpacer: { height: Spacing.xl, backgroundColor: Colors.surface, marginVertical: Spacing.lg },
-  hScroll: { paddingHorizontal: Spacing.section, gap: 12 },
-  eventCard: { borderRadius: Radius.xl, overflow: 'hidden', ...Shadows.md },
-  eventHero: { height: 180, justifyContent: 'space-between', padding: Spacing.md },
-  eventOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.55)',
-  },
-  eventChipRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  seatsChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-    backgroundColor: 'rgba(0,0,0,0.40)',
+  eventCatText: { ...Typography.micro, color: '#FFF', fontWeight: '700' as const },
+  urgencyPill: {
+    backgroundColor: '#FF6B35',
     borderRadius: Radius.pill,
     paddingHorizontal: 8,
     paddingVertical: 3,
   },
-  seatsChipText: { ...Typography.micro, color: '#FFD60A' },
-  eventCardBottom: { gap: 5 },
-  eventCardTitle: { ...Typography.h3, color: '#FFF', letterSpacing: -0.3 },
-  eventCardMeta: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  eventCardMetaText: { ...Typography.caption, color: 'rgba(255,255,255,0.70)' },
+  urgencyText: { ...Typography.micro, color: '#FFF', fontWeight: '700' as const },
+  eventBottom: { gap: 4 },
+  eventEmoji: { fontSize: 28, marginBottom: 2 },
+  eventTitle: { ...Typography.h5, color: '#FFF', lineHeight: 18 },
+  eventMeta: { ...Typography.micro, color: 'rgba(255,255,255,0.7)' },
 
-  // Food cards
-  foodList: { paddingHorizontal: Spacing.section, gap: 10 },
-  restCard: { overflow: 'hidden' },
-  restBanner: { height: 90, alignItems: 'center', justifyContent: 'center' },
-  restEmoji: { fontSize: 44 },
-  restInfo: { padding: Spacing.md, gap: 4 },
-  restTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  restName: { ...Typography.h4, color: Colors.text },
-  restRating: { flexDirection: 'row', alignItems: 'center', gap: 3 },
-  ratingText: { ...Typography.label, color: Colors.text, fontSize: 12 },
-  restMeta: { ...Typography.caption, color: Colors.textSecondary },
-
-  // Challenge banner
+  // ── Coding challenge streak banner ──
   challengeBanner: {
+    marginHorizontal: Spacing.section,
+    marginTop: Spacing.xl,
+    borderRadius: Radius.xl,
+    backgroundColor: '#1C1C2E',
+    padding: Spacing.xl,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.darkBg,
-    marginHorizontal: Spacing.section,
-    borderRadius: Radius.xl,
-    padding: Spacing.xl,
     justifyContent: 'space-between',
-    borderTopWidth: 1,
-    borderTopColor: Colors.highlight,
     ...Shadows.colored('#6C63FF'),
   },
-  challengeLeft: { gap: 6, flex: 1 },
-  challengeLabel: { ...Typography.micro, color: Colors.accent, letterSpacing: 1.5 },
-  challengeTitle: { ...Typography.h2, color: '#FFF' },
-  challengeMeta: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  easyBadge: {
-    backgroundColor: Colors.successLight,
-    borderRadius: Radius.pill,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
+  challengeLabel: { ...Typography.micro, color: '#6C63FF', letterSpacing: 1.5, marginBottom: 4 },
+  challengeTitle: { ...Typography.h3, color: '#FFF' },
+  challengeSub: { ...Typography.caption, color: 'rgba(255,255,255,0.6)', marginTop: 4 },
+  challengeArrow: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#6C63FF',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  easyText: { ...Typography.micro, color: Colors.success, fontWeight: '700' as const },
-  challengeDesc: { ...Typography.caption, color: Colors.textDimmed },
-  challengeRight: { alignItems: 'center', gap: 8, marginLeft: Spacing.xl },
-  challengeIcon: { fontSize: 36 },
-  challengeCta: { ...Typography.label, color: Colors.accent, fontWeight: '700' as const, fontSize: 13 },
 });

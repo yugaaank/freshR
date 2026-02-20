@@ -7,6 +7,7 @@ import {
     ScrollView,
     StyleSheet,
     Text,
+    TextInput,
     TouchableOpacity,
     View,
 } from 'react-native';
@@ -29,21 +30,49 @@ const CATEGORY_COLORS: Record<string, string> = {
 export default function EventsScreen() {
     const [activeTab, setActiveTab] = useState(0);
     const [activeCat, setActiveCat] = useState('All');
+    const [search, setSearch] = useState('');
+    const [isSearching, setIsSearching] = useState(false);
 
-    const filtered = events.filter(
-        (e) => activeCat === 'All' || e.category === activeCat
-    );
-    const featured = filtered[0];
-    const rest = filtered.slice(1);
+    const searchLower = search.trim().toLowerCase();
+
+    const filtered = events.filter((e) => {
+        const matchesCat = activeCat === 'All' || e.category === activeCat;
+        const matchesSearch = searchLower === '' ||
+            e.title.toLowerCase().includes(searchLower) ||
+            e.venue.toLowerCase().includes(searchLower);
+        return matchesCat && matchesSearch;
+    });
+
+    const featured = filtered.length > 0 && searchLower === '' ? filtered[0] : null;
+    const rest = searchLower === '' ? filtered.slice(1) : filtered;
 
     return (
         <SafeAreaView style={styles.safe} edges={['top']}>
             {/* Header */}
             <View style={styles.header}>
-                <Text style={styles.headerTitle}>Events</Text>
-                <TouchableOpacity style={styles.searchIconBtn} activeOpacity={0.88}>
-                    <Ionicons name="search-outline" size={22} color={Colors.text} />
-                </TouchableOpacity>
+                {isSearching ? (
+                    <View style={styles.searchBarActive}>
+                        <Ionicons name="search" size={18} color={Colors.textTertiary} />
+                        <TextInput
+                            autoFocus
+                            style={styles.searchInput}
+                            placeholder="Search events, venues..."
+                            placeholderTextColor={Colors.textTertiary}
+                            value={search}
+                            onChangeText={setSearch}
+                        />
+                        <TouchableOpacity onPress={() => { setIsSearching(false); setSearch(''); }}>
+                            <Ionicons name="close-circle" size={20} color={Colors.textTertiary} />
+                        </TouchableOpacity>
+                    </View>
+                ) : (
+                    <>
+                        <Text style={styles.headerTitle}>Events</Text>
+                        <TouchableOpacity style={styles.searchIconBtn} activeOpacity={0.88} onPress={() => setIsSearching(true)}>
+                            <Ionicons name="search-outline" size={22} color={Colors.text} />
+                        </TouchableOpacity>
+                    </>
+                )}
             </View>
 
             {/* Tabs */}
@@ -63,27 +92,29 @@ export default function EventsScreen() {
             </View>
 
             {/* Category Pills */}
-            <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.catRow}
-            >
-                {CATEGORIES.map((cat) => (
-                    <TouchableOpacity
-                        key={cat}
-                        style={[
-                            styles.catChip,
-                            activeCat === cat && { backgroundColor: CATEGORY_COLORS[cat] ?? Colors.primary },
-                        ]}
-                        onPress={() => setActiveCat(cat)}
-                        activeOpacity={0.88}
-                    >
-                        <Text style={[styles.catText, activeCat === cat && styles.catTextActive]}>
-                            {cat}
-                        </Text>
-                    </TouchableOpacity>
-                ))}
-            </ScrollView>
+            <View style={styles.catRowWrap}>
+                <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.catRow}
+                >
+                    {CATEGORIES.map((cat) => (
+                        <TouchableOpacity
+                            key={cat}
+                            style={[
+                                styles.catChip,
+                                activeCat === cat && { backgroundColor: CATEGORY_COLORS[cat] ?? Colors.primary },
+                            ]}
+                            onPress={() => setActiveCat(cat)}
+                            activeOpacity={0.88}
+                        >
+                            <Text style={[styles.catText, activeCat === cat && styles.catTextActive]}>
+                                {cat}
+                            </Text>
+                        </TouchableOpacity>
+                    ))}
+                </ScrollView>
+            </View>
 
             <FlatList
                 data={rest}
@@ -179,6 +210,22 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
     },
+    searchBarActive: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: Colors.surface,
+        borderRadius: Radius.pill,
+        paddingHorizontal: Spacing.md,
+        height: 40,
+        gap: 8,
+    },
+    searchInput: {
+        flex: 1,
+        ...Typography.body2,
+        color: Colors.text,
+        padding: 0,
+    },
     // Tab bar
     tabRow: {
         flexDirection: 'row',
@@ -198,12 +245,23 @@ const styles = StyleSheet.create({
     tabText: { ...Typography.h5, color: Colors.textSecondary },
     tabTextActive: { color: Colors.primary },
     // Categories
-    catRow: { paddingHorizontal: Spacing.section, gap: 8, paddingBottom: Spacing.md },
+    catRowWrap: {
+        height: 48,
+        borderBottomWidth: 1,
+        borderBottomColor: Colors.border,
+    },
+    catRow: {
+        paddingHorizontal: Spacing.section,
+        gap: 8,
+        alignItems: 'center' as const,
+        flexDirection: 'row' as const,
+    },
     catChip: {
         paddingHorizontal: 14,
         paddingVertical: 6,
         borderRadius: Radius.pill,
         backgroundColor: Colors.surface,
+        alignSelf: 'center' as const,
     },
     catText: { ...Typography.label, fontSize: 12, color: Colors.textSecondary, fontWeight: '600' as const },
     catTextActive: { color: '#FFF' },

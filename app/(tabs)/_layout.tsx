@@ -22,7 +22,7 @@ function TabIcon({ name, label, focused, badge }: TabIconProps) {
           </View>
         ) : null}
       </View>
-      <Text style={[styles.tabLabel, focused && styles.tabLabelFocused]}>{label}</Text>
+      <Text style={[styles.tabLabel, focused && styles.tabLabelFocused]} numberOfLines={1}>{label}</Text>
       {/* Active indicator dot */}
       {focused && <View style={styles.activeDot} />}
     </View>
@@ -81,7 +81,7 @@ export default function TabsLayout() {
         name="calendar"
         options={{
           tabBarIcon: ({ focused }) => (
-            <TabIcon name={focused ? 'calendar' : 'calendar-outline'} label="Calendar" focused={focused} />
+            <TabIcon name={focused ? 'calendar' : 'calendar-outline'} label="Cal" focused={focused} />
           ),
         }}
       />
@@ -101,7 +101,7 @@ const styles = StyleSheet.create({
     // Remove default shadow, use elevation only
     shadowOpacity: 0,
   },
-  iconWrap: { alignItems: 'center', gap: 3, paddingHorizontal: Spacing.sm, position: 'relative' },
+  iconWrap: { alignItems: 'center', gap: 2, width: 58, position: 'relative' },
   iconContainer: { position: 'relative' },
   badge: {
     position: 'absolute',
