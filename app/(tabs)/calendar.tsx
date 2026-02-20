@@ -15,7 +15,7 @@ import { Colors, Radius, Shadows, Spacing, Typography } from '../../src/theme';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const NOW = new Date(2025, 1, 20); // Feb 20 2025 (dev fixture)
+
 const TODAY_STR = '2025-02-20';
 const DAYS_SHORT = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 const DAYS_ABBR = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -187,9 +187,11 @@ const SECTIONS = buildAgenda();
 const EVENT_DATE_SET = new Set(events.map((e) => e.date));
 
 export default function CalendarScreen() {
-    const [calYear, setCalYear] = useState(NOW.getFullYear());
-    const [calMonth, setCalMonth] = useState(NOW.getMonth());
-    const [selectedDate, setSelectedDate] = useState(TODAY_STR);
+    const today = new Date();
+    const initialDateString = today.toISOString().split('T')[0];
+    const [calYear, setCalYear] = useState(today.getFullYear());
+    const [calMonth, setCalMonth] = useState(today.getMonth());
+    const [selectedDate, setSelectedDate] = useState(initialDateString);
     const [calExpanded, setCalExpanded] = useState(true);
     const [search, setSearch] = useState('');
     const [isSearching, setIsSearching] = useState(false);
@@ -226,7 +228,7 @@ export default function CalendarScreen() {
         }
     }, []);
 
-    const todayEvents = useMemo(() => events.filter((e) => e.date === TODAY_STR), []);
+
 
     return (
         <SafeAreaView style={styles.safe} edges={['top']}>

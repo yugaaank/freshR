@@ -3,14 +3,13 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
-    Dimensions,
     Pressable,
     ScrollView,
     StyleSheet,
     Text,
     TextInput,
     TouchableOpacity,
-    View,
+    View
 } from 'react-native';
 import Animated, {
     Easing,
@@ -32,7 +31,7 @@ import TagPill from '../../src/components/ui/TagPill';
 import { events } from '../../src/data/events';
 import { Colors, Radius, Shadows, Spacing, Typography } from '../../src/theme';
 
-const { width: SW } = Dimensions.get('window');
+
 
 const TABS = ['My College', 'City Events'];
 const CATEGORIES = ['All', 'Tech', 'Music', 'Sports', 'Cultural', 'Workshop', 'Academic'];

@@ -63,10 +63,18 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
-        name="events"
+        name="waves"
         options={{
           tabBarIcon: ({ focused }) => (
-            <TabIcon name={focused ? 'ticket' : 'ticket-outline'} label="Events" focused={focused} />
+            <TabIcon name={focused ? 'play-circle' : 'play-circle-outline'} label="Waves" focused={focused} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="explore"
+        options={{
+          tabBarIcon: ({ focused }) => (
+            <TabIcon name={focused ? 'compass' : 'compass-outline'} label="Explore" focused={focused} />
           ),
         }}
       />

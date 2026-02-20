@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
+import { LinearGradient } from 'expo-linear-gradient';
 import React, { useState } from 'react';
 import {
     Dimensions,
@@ -252,7 +253,7 @@ export default function FoodScreen() {
                     return (
                         <SpringCard delay={150 + index * 50} style={styles.menuCardWrap}>
                             <View style={styles.menuCard}>
-                                {/* Food image */}
+                                {/* Food image container */}
                                 <View style={styles.imageWrap}>
                                     {item.image ? (
                                         <Image
@@ -261,47 +262,61 @@ export default function FoodScreen() {
                                             resizeMode="cover"
                                         />
                                     ) : (
-                                        <View style={styles.imagePlaceholder}>
-                                            <Ionicons name="restaurant-outline" size={32} color={Colors.borderStrong} />
-                                        </View>
+                                        <LinearGradient
+                                            colors={[Colors.surface, Colors.border]}
+                                            style={styles.imagePlaceholder}
+                                        >
+                                            <Ionicons name="fast-food-outline" size={32} color={Colors.textTertiary} />
+                                        </LinearGradient>
                                     )}
-                                    {/* Veg / NonVeg indicator */}
+                                    {/* Veg / NonVeg indicator over image */}
                                     <View style={[styles.vegIndicator, { borderColor: item.isVeg ? '#22C55E' : '#EF4444' }]}>
                                         <View style={[styles.vegIndicatorDot, { backgroundColor: item.isVeg ? '#22C55E' : '#EF4444' }]} />
                                     </View>
-                                    {/* Rating chip */}
+                                    {/* Rating badge overlapping top right */}
                                     <View style={styles.ratingChip}>
-                                        <Ionicons name="star" size={9} color="#FFD60A" />
+                                        <Ionicons name="star" size={10} color="#FFD60A" />
                                         <Text style={styles.ratingChipText}>{item.rating}</Text>
                                     </View>
                                     {item.isPopular && (
-                                        <View style={styles.popularChip}>
-                                            <Text style={styles.popularChipText}>🔥 Popular</Text>
-                                        </View>
+                                        <LinearGradient
+                                            colors={['#FF8A00', '#E52E71']}
+                                            start={{ x: 0, y: 0 }}
+                                            end={{ x: 1, y: 1 }}
+                                            style={styles.popularChipGradient}
+                                        >
+                                            <Text style={styles.popularChipTextGradient}>🔥 Bestseller</Text>
+                                        </LinearGradient>
                                     )}
                                 </View>
-                                {/* Item info */}
+
+                                {/* Item textual info */}
                                 <View style={styles.itemInfo}>
-                                    <Text style={styles.itemName} numberOfLines={1}>{item.name}</Text>
-                                    <Text style={styles.itemDesc} numberOfLines={1}>{item.description}</Text>
-                                    <View style={styles.itemBottom}>
-                                        <Text style={styles.itemPrice}>₹{item.price}</Text>
+                                    <Text style={styles.itemName} numberOfLines={2}>{item.name}</Text>
+                                    <Text style={styles.itemDesc} numberOfLines={2}>{item.description}</Text>
+
+                                    <View style={styles.itemActionsRow}>
+                                        <View>
+                                            <Text style={styles.itemPrice}>₹{item.price}</Text>
+                                            {item.isPopular && <Text style={styles.strikePrice}>₹{Math.floor(item.price * 1.2)}</Text>}
+                                        </View>
+
                                         {qty === 0 ? (
                                             <TouchableOpacity
-                                                style={styles.addBtn}
+                                                style={styles.addBtnContainer}
                                                 onPress={() => cart.addItem(item, item.restaurantId)}
-                                                activeOpacity={0.85}
+                                                activeOpacity={0.8}
                                             >
-                                                <Text style={styles.addBtnText}>ADD</Text>
+                                                <Text style={styles.addBtnTextBeautiful}>ADD <Ionicons name="add" size={14} /></Text>
                                             </TouchableOpacity>
                                         ) : (
-                                            <View style={styles.qtyCtrl}>
-                                                <TouchableOpacity onPress={() => cart.decrementItem(item.id)} style={styles.qtyBtn}>
-                                                    <Ionicons name="remove" size={12} color={Colors.primary} />
+                                            <View style={styles.qtyCtrlBeautiful}>
+                                                <TouchableOpacity onPress={() => cart.decrementItem(item.id)} style={styles.qtyBtnBeautiful}>
+                                                    <Ionicons name="remove" size={16} color="#FFF" />
                                                 </TouchableOpacity>
-                                                <Text style={styles.qtyText}>{qty}</Text>
-                                                <TouchableOpacity onPress={() => cart.addItem(item, item.restaurantId)} style={styles.qtyBtn}>
-                                                    <Ionicons name="add" size={12} color={Colors.primary} />
+                                                <Text style={styles.qtyTextBeautiful}>{qty}</Text>
+                                                <TouchableOpacity onPress={() => cart.addItem(item, item.restaurantId)} style={styles.qtyBtnBeautiful}>
+                                                    <Ionicons name="add" size={16} color="#FFF" />
                                                 </TouchableOpacity>
                                             </View>
                                         )}
@@ -495,86 +510,103 @@ const styles = StyleSheet.create({
 
     // 2-column grid
     grid: { paddingHorizontal: Spacing.section, paddingTop: Spacing.sm, paddingBottom: 100 },
-    row: { gap: 12, marginBottom: 12 },
+    row: { gap: 16, marginBottom: 16 },
     menuCardWrap: {
         width: ITEM_W,
-        borderRadius: Radius.lg,
-        ...Shadows.sm,
+        borderRadius: 20,
+        backgroundColor: '#FFF',
+        ...Shadows.md,
+        shadowColor: 'rgba(0,0,0,0.1)', // Softer shadow
+        shadowRadius: 10,
+        elevation: 6,
     },
     menuCard: {
         flex: 1,
-        backgroundColor: '#FFF',
-        borderRadius: Radius.lg,
+        borderRadius: 20,
         overflow: 'hidden',
     },
 
     // Food image
-    imageWrap: { width: '100%', height: ITEM_W * 0.75, position: 'relative' },
-    foodImage: { width: '100%', height: '100%', backgroundColor: '#F0F0F0' },
-    imagePlaceholder: { width: '100%', height: '100%', backgroundColor: Colors.surface, alignItems: 'center', justifyContent: 'center' },
+    imageWrap: { width: '100%', height: ITEM_W * 0.85, position: 'relative' },
+    foodImage: { width: '100%', height: '100%', backgroundColor: Colors.surface },
+    imagePlaceholder: { width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' },
     vegIndicator: {
         position: 'absolute',
-        bottom: 6,
-        left: 6,
-        width: 14,
-        height: 14,
-        borderRadius: 3,
+        top: 8,
+        left: 8,
+        width: 16,
+        height: 16,
+        borderRadius: 4,
         borderWidth: 1.5,
-        backgroundColor: '#FFF',
+        backgroundColor: 'rgba(255,255,255,0.9)',
         alignItems: 'center',
         justifyContent: 'center',
     },
-    vegIndicatorDot: { width: 7, height: 7, borderRadius: 3.5 },
+    vegIndicatorDot: { width: 8, height: 8, borderRadius: 4 },
     ratingChip: {
         position: 'absolute',
-        top: 6,
-        right: 6,
+        top: 8,
+        right: 8,
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 2,
-        backgroundColor: 'rgba(0,0,0,0.65)',
-        borderRadius: 4,
-        paddingHorizontal: 5,
-        paddingVertical: 3,
+        gap: 4,
+        backgroundColor: 'rgba(255,255,255,0.95)',
+        borderRadius: Radius.pill,
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        ...Shadows.sm,
     },
-    ratingChipText: { fontSize: 9, color: '#FFF', fontWeight: '700' as const },
-    popularChip: {
+    ratingChipText: { fontSize: 11, color: '#333', fontWeight: 'bold' as const },
+    popularChipGradient: {
         position: 'absolute',
-        bottom: 6,
-        right: 6,
-        backgroundColor: '#FFF3E8',
-        borderRadius: 4,
-        paddingHorizontal: 5,
-        paddingVertical: 2,
+        bottom: 8,
+        left: 8,
+        borderRadius: Radius.pill,
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        ...Shadows.sm,
     },
-    popularChipText: { fontSize: 9, color: Colors.primary, fontWeight: '700' as const },
+    popularChipTextGradient: { fontSize: 10, color: '#FFF', fontWeight: 'bold' as const },
 
     // Item info
-    itemInfo: { padding: Spacing.sm, gap: 3 },
-    itemName: { ...Typography.h5, color: Colors.text, fontSize: 13 },
-    itemDesc: { ...Typography.micro, color: Colors.textSecondary, fontSize: 10 },
-    itemBottom: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 },
-    itemPrice: { ...Typography.label, color: Colors.text, fontWeight: '700' as const, fontSize: 13 },
-
-    // ADD / QTY (Blinkit outlined style)
-    addBtn: {
-        borderWidth: 1.5,
-        borderColor: Colors.primary,
-        borderRadius: 6,
-        paddingHorizontal: 14,
-        paddingVertical: 5,
+    itemInfo: { padding: Spacing.md, gap: 4, flex: 1, justifyContent: 'space-between' },
+    itemName: { ...Typography.h5, color: Colors.text, fontSize: 14, lineHeight: 18 },
+    itemDesc: { ...Typography.caption, color: Colors.textTertiary, fontSize: 11, lineHeight: 15 },
+    itemActionsRow: {
+        flexDirection: 'row',
+        alignItems: 'flex-end',
+        justifyContent: 'space-between',
+        marginTop: 8,
     },
-    addBtnText: { ...Typography.label, color: Colors.primary, fontSize: 12, fontWeight: '700' as const },
-    qtyCtrl: {
+    itemPrice: { ...Typography.h5, color: Colors.text, fontSize: 15 },
+    strikePrice: { ...Typography.micro, color: Colors.textTertiary, textDecorationLine: 'line-through', marginTop: 2 },
+
+    // Beautiful ADD / QTY controls
+    addBtnContainer: {
+        backgroundColor: 'rgba(255,107,53,0.1)',
+        borderWidth: 1,
+        borderColor: 'rgba(255,107,53,0.3)',
+        borderRadius: Radius.lg,
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+    },
+    addBtnTextBeautiful: {
+        ...Typography.label,
+        color: Colors.primary,
+        fontSize: 13,
+        fontWeight: 'bold' as const,
+    },
+    qtyCtrlBeautiful: {
         flexDirection: 'row',
         alignItems: 'center',
-        borderWidth: 1.5,
-        borderColor: Colors.primary,
-        borderRadius: 6,
-        overflow: 'hidden',
+        backgroundColor: Colors.primary,
+        borderRadius: Radius.lg,
+        paddingHorizontal: 4,
+        paddingVertical: 4,
+        ...Shadows.sm,
     },
-    qtyBtn: { padding: 5, paddingHorizontal: 7 },
-    qtyText: { ...Typography.label, color: Colors.primary, fontSize: 12, minWidth: 18, textAlign: 'center' },
+    qtyBtnBeautiful: { padding: 4, paddingHorizontal: 6 },
+    qtyTextBeautiful: { ...Typography.label, color: '#FFF', fontSize: 13, minWidth: 20, textAlign: 'center', fontWeight: 'bold' as const },
 
     // Cart bar
     cartBarWrap: {

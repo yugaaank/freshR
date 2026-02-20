@@ -4,6 +4,7 @@ import { router } from 'expo-router';
 import React, { useState } from 'react';
 import {
   Dimensions,
+  ImageBackground,
   Pressable,
   StyleSheet,
   Text,
@@ -50,7 +51,7 @@ const SERVICE_CARDS = [
     emoji: '🎟️',
     colors: ['#DDE3FF', '#EEF2FF'],
     badgeBg: '#6C63FF',
-    route: '/(tabs)/events',
+    route: '/(tabs)/explore',
   },
   {
     id: 'academics',
@@ -194,7 +195,7 @@ export default function HomeScreen() {
         contentContainerStyle={styles.scroll}
       >
         {/* ═══ PROMO BANNER (Blinkit ₹50 OFF style) ═══ */}
-        <SpringCard style={styles.promoBannerWrap} delay={100} onPress={() => router.push('/(tabs)/events')}>
+        <SpringCard style={styles.promoBannerWrap} delay={100} onPress={() => router.push('/(tabs)/explore')}>
           <LinearGradient
             colors={['#1A5C3A', '#0D3D27']}
             start={{ x: 0, y: 0 }}
@@ -202,10 +203,10 @@ export default function HomeScreen() {
             style={styles.promoBanner}
           >
             <View style={styles.promoLeft}>
-              <Text style={styles.promoSmall}>TODAY'S HIGHLIGHT</Text>
+              <Text style={styles.promoSmall}>TODAY&apos;S HIGHLIGHT</Text>
               <Text style={styles.promoTitle}>HackMIT{'\n'}This Weekend 🚀</Text>
               <View style={styles.promoCta}>
-                <Text style={styles.promoCtaText}>REGISTER NOW</Text>
+                <Text style={styles.promoCtaText}>EXPLORE EVENTS</Text>
               </View>
             </View>
             <Text style={styles.promoEmoji}>🏆</Text>
@@ -276,7 +277,7 @@ export default function HomeScreen() {
           <>
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>Events Near You</Text>
-              <TouchableOpacity onPress={() => router.push('/(tabs)/events')}>
+              <TouchableOpacity onPress={() => router.push('/(tabs)/explore')}>
                 <Text style={styles.seeAll}>See all →</Text>
               </TouchableOpacity>
             </View>
@@ -290,29 +291,35 @@ export default function HomeScreen() {
                   key={ev.id}
                   delay={250 + idx * 50}
                   style={styles.eventCardWrap}
+                  onPress={() => router.push(`/event/${ev.id}` as any)}
                 >
-                  <LinearGradient
-                    colors={[ev.colorBg ?? '#1C1C1E', '#000000']}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 0, y: 1 }}
-                    style={styles.eventCard}
+                  <ImageBackground
+                    source={{ uri: ev.image }}
+                    style={[StyleSheet.absoluteFill, { backgroundColor: ev.colorBg ?? '#1C1C1E' }]}
+                    imageStyle={{ borderRadius: Radius.xl }}
                   >
-                    <View style={styles.eventTop}>
-                      <View style={styles.eventCatPill}>
-                        <Text style={styles.eventCatText}>{ev.category}</Text>
-                      </View>
-                      {ev.seatsLeft <= 15 && (
-                        <View style={styles.urgencyPill}>
-                          <Text style={styles.urgencyText}>⚡ {ev.seatsLeft} left</Text>
+                    <LinearGradient
+                      colors={['rgba(0,0,0,0.1)', 'rgba(0,0,0,0.85)']}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 0, y: 1 }}
+                      style={styles.eventCard}
+                    >
+                      <View style={styles.eventTop}>
+                        <View style={styles.eventCatPill}>
+                          <Text style={styles.eventCatText}>{ev.category}</Text>
                         </View>
-                      )}
-                    </View>
-                    <View style={styles.eventBottom}>
-                      <Text style={styles.eventEmoji}>{ev.emoji ?? '📅'}</Text>
-                      <Text style={styles.eventTitle} numberOfLines={2}>{ev.title}</Text>
-                      <Text style={styles.eventMeta}>📅 {ev.date} · {ev.time}</Text>
-                    </View>
-                  </LinearGradient>
+                        {ev.seatsLeft <= 15 && (
+                          <View style={styles.urgencyPill}>
+                            <Text style={styles.urgencyText}>⚡ {ev.seatsLeft} left</Text>
+                          </View>
+                        )}
+                      </View>
+                      <View style={styles.eventBottom}>
+                        <Text style={styles.eventTitle} numberOfLines={2}>{ev.title}</Text>
+                        <Text style={styles.eventMeta}>📅 {ev.date} · {ev.time}</Text>
+                      </View>
+                    </LinearGradient>
+                  </ImageBackground>
                 </SpringCard>
               ))}
             </Animated.ScrollView>
@@ -334,7 +341,7 @@ export default function HomeScreen() {
             <View>
               <Text style={styles.challengeLabel}>DAILY CHALLENGE ACTIVE</Text>
               <Text style={styles.challengeTitle}>🔥 14-Day Streak!</Text>
-              <Text style={styles.challengeSub}>Keep it going — solve today's problem</Text>
+              <Text style={styles.challengeSub}>Keep it going — solve today&apos;s problem</Text>
             </View>
             <View style={styles.challengeArrow}>
               <Ionicons name="arrow-forward" size={18} color="#FFF" />
