@@ -6,9 +6,11 @@ import {
     StyleSheet,
     Text,
     TouchableOpacity,
-    View
+    View,
 } from 'react-native';
+import Animated, { Easing, useAnimatedStyle, useSharedValue, withRepeat, withTiming } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 import TagPill from '../src/components/ui/TagPill';
 import { Colors, Radius, Shadows, Spacing, Typography } from '../src/theme';
 
@@ -24,6 +26,39 @@ const LANDMARKS = [
 ];
 
 const CATEGORY_FILTERS = ['All', 'Academic', 'Food', 'Sports', 'Tech', 'Health', 'Events'];
+
+function AnimatedGradientBorder() {
+    const rotation = useSharedValue(0);
+
+    React.useEffect(() => {
+        rotation.value = withRepeat(
+            withTiming(360, { duration: 3000, easing: Easing.linear }),
+            -1
+        );
+    }, [rotation]);
+
+    const animatedStyle = useAnimatedStyle(() => ({
+        transform: [{ rotate: `${rotation.value}deg` }],
+    }));
+
+    return (
+        <View style={[StyleSheet.absoluteFill, { borderRadius: Radius.lg, overflow: 'hidden' }]}>
+            <Animated.View style={[{ position: 'absolute', width: '200%', height: '200%', left: '-50%', top: '-50%' }, animatedStyle]}>
+                <Svg width="100%" height="100%">
+                    <Defs>
+                        <LinearGradient id="grad" x1="0" y1="0" x2="1" y2="1">
+                            <Stop offset="0" stopColor={Colors.primary} stopOpacity="1" />
+                            <Stop offset="0.5" stopColor={Colors.primary} stopOpacity="0" />
+                            <Stop offset="1" stopColor={Colors.primary} stopOpacity="1" />
+                        </LinearGradient>
+                    </Defs>
+                    <Rect width="100%" height="100%" fill="url(#grad)" />
+                </Svg>
+            </Animated.View>
+            <View style={{ position: 'absolute', top: 2, left: 2, right: 2, bottom: 2, backgroundColor: Colors.cardBg, borderRadius: Radius.lg - 2 }} />
+        </View>
+    );
+}
 
 // Mock map tiles to simulate a campus map
 function MockMapView({ activeLandmark }: { activeLandmark: string | null }) {
@@ -160,23 +195,28 @@ export default function CampusMapScreen() {
                     contentContainerStyle={styles.landmarkList}
                     renderItem={({ item }) => (
                         <TouchableOpacity
-                            style={[styles.landmarkCard, activeLandmark === item.id && styles.landmarkCardActive, Shadows.sm]}
+                            style={[styles.landmarkCard, Shadows.sm]}
                             onPress={() => setActiveLandmark(activeLandmark === item.id ? null : item.id)}
                             activeOpacity={0.9}
                         >
-                            <View style={[styles.landmarkIcon, { backgroundColor: item.color }]}>
-                                <Text style={{ fontSize: 20 }}>{item.icon}</Text>
-                            </View>
-                            <View style={styles.landmarkInfo}>
-                                <Text style={styles.landmarkName}>{item.name}</Text>
-                                <Text style={styles.landmarkMeta}>{item.floor} · {item.distance}</Text>
-                                <Text style={[styles.landmarkStatus, { color: item.available ? Colors.success : Colors.error }]}>
-                                    {item.opens}
-                                </Text>
-                            </View>
-                            <View style={styles.landmarkRight}>
-                                <TagPill label={item.category} variant="blue" size="sm" />
-                                <Ionicons name="navigate-outline" size={18} color={Colors.primary} style={{ marginTop: 6 }} />
+                            {activeLandmark === item.id && <AnimatedGradientBorder />}
+
+                            {/* Inner content wrapper to sit above absolute border view */}
+                            <View style={{ flexDirection: 'row', alignItems: 'flex-start', flex: 1, zIndex: 1 }}>
+                                <View style={[styles.landmarkIcon, { backgroundColor: item.color }]}>
+                                    <Text style={{ fontSize: 20 }}>{item.icon}</Text>
+                                </View>
+                                <View style={styles.landmarkInfo}>
+                                    <Text style={styles.landmarkName}>{item.name}</Text>
+                                    <Text style={styles.landmarkMeta}>{item.floor} · {item.distance}</Text>
+                                    <Text style={[styles.landmarkStatus, { color: item.available ? Colors.success : Colors.error }]}>
+                                        {item.opens}
+                                    </Text>
+                                </View>
+                                <View style={styles.landmarkRight}>
+                                    <TagPill label={item.category} variant="blue" size="sm" />
+                                    <Ionicons name="navigate-outline" size={18} color={Colors.primary} style={{ marginTop: 6 }} />
+                                </View>
                             </View>
                         </TouchableOpacity>
                     )}
@@ -232,10 +272,8 @@ const styles = StyleSheet.create({
         backgroundColor: Colors.cardBg,
         borderRadius: Radius.lg,
         padding: Spacing.md,
-        borderWidth: 1.5,
         borderColor: 'transparent',
     },
-    landmarkCardActive: { borderColor: Colors.primary },
     landmarkIcon: {
         width: 48,
         height: 48,

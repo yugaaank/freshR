@@ -1,3 +1,4 @@
+import { BlurView } from 'expo-blur';
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View, ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -23,7 +24,9 @@ export default function BottomActionBar({
     const insets = useSafeAreaInsets();
 
     return (
-        <View
+        <BlurView
+            intensity={80}
+            tint="light"
             style={[
                 styles.container,
                 Shadows.floating,
@@ -45,7 +48,7 @@ export default function BottomActionBar({
             >
                 <Text style={styles.buttonText}>{buttonLabel}</Text>
             </TouchableOpacity>
-        </View>
+        </BlurView>
     );
 }
 
@@ -55,7 +58,7 @@ const styles = StyleSheet.create({
         bottom: 0,
         left: 0,
         right: 0,
-        backgroundColor: Colors.cardBg,
+        backgroundColor: 'rgba(255,255,255,0.75)',
         flexDirection: 'row',
         alignItems: 'center',
         paddingHorizontal: Spacing.lg,

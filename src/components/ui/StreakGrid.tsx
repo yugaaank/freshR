@@ -1,5 +1,5 @@
-import React from 'react';
-import { ScrollView, StyleSheet, View, ViewStyle } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { Animated, ScrollView, StyleSheet, View, ViewStyle } from 'react-native';
 import { StreakDay } from '../../data/challenges';
 import { Colors, Radius } from '../../theme';
 
@@ -25,6 +25,23 @@ export default function StreakGrid({ data, style }: StreakGridProps) {
         weeks.push(data.slice(i, i + 7));
     }
 
+    const cellAnims = useRef(data.map(() => new Animated.Value(0))).current;
+
+    useEffect(() => {
+        Animated.stagger(
+            30,
+            cellAnims.map(anim =>
+                Animated.timing(anim, {
+                    toValue: 1,
+                    duration: 300,
+                    useNativeDriver: true,
+                })
+            )
+        ).start();
+    }, [cellAnims]);
+
+    let flatIndex = 0;
+
     return (
         <ScrollView
             horizontal
@@ -34,16 +51,20 @@ export default function StreakGrid({ data, style }: StreakGridProps) {
         >
             {weeks.map((week, wi) => (
                 <View key={wi} style={styles.week}>
-                    {week.map((day, di) => (
-                        <View
-                            key={di}
-                            style={[
-                                styles.cell,
-                                { backgroundColor: getColor(day.solved) },
-                                day.isToday && styles.todayCell,
-                            ]}
-                        />
-                    ))}
+                    {week.map((day, di) => {
+                        const opacity = cellAnims[flatIndex++];
+                        return (
+                            <Animated.View
+                                key={di}
+                                style={[
+                                    styles.cell,
+                                    { backgroundColor: getColor(day.solved) },
+                                    day.isToday && styles.todayCell,
+                                    { opacity },
+                                ]}
+                            />
+                        );
+                    })}
                 </View>
             ))}
         </ScrollView>

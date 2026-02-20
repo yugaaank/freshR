@@ -1,9 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
     Dimensions,
-    FlatList,
+    Pressable,
     ScrollView,
     StyleSheet,
     Text,
@@ -11,6 +12,20 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
+import Animated, {
+    Easing,
+    Extrapolation,
+    FadeInDown,
+    FadeInUp,
+    interpolate,
+    useAnimatedRef,
+    useAnimatedStyle,
+    useScrollViewOffset,
+    useSharedValue,
+    withRepeat,
+    withSpring,
+    withTiming,
+} from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Card from '../../src/components/ui/Card';
 import TagPill from '../../src/components/ui/TagPill';
@@ -26,6 +41,51 @@ const CATEGORY_COLORS: Record<string, string> = {
     Tech: '#007AFF', Music: '#FF2D55', Sports: '#34C759',
     Cultural: '#AF52DE', Workshop: '#FF9500', Academic: '#5856D6', All: '#6B6B6B',
 };
+
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+
+function SpringCard({ children, style, onPress, delay = 0, entering, ...props }: any) {
+    const scale = useSharedValue(1);
+    const animatedStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
+
+    return (
+        <AnimatedPressable
+            onPressIn={() => { scale.value = withSpring(0.96, { damping: 15, stiffness: 200 }); }}
+            onPressOut={() => { scale.value = withSpring(1, { damping: 15, stiffness: 200 }); }}
+            onPress={onPress}
+            style={[style, animatedStyle]}
+            entering={entering ? entering.delay(delay).springify() : FadeInUp.delay(delay).springify()}
+            {...props}
+        >
+            {children}
+        </AnimatedPressable>
+    );
+}
+
+function SkeletonCard() {
+    const opacity = useSharedValue(0.3);
+
+    useEffect(() => {
+        opacity.value = withRepeat(
+            withTiming(1, { duration: 800, easing: Easing.inOut(Easing.ease) }),
+            -1,
+            true
+        );
+    }, [opacity]);
+
+    const animatedStyle = useAnimatedStyle(() => ({ opacity: opacity.value }));
+
+    return (
+        <Animated.View style={[styles.skeletonRow, animatedStyle]}>
+            <View style={styles.skeletonImage} />
+            <View style={styles.skeletonContent}>
+                <View style={styles.skeletonTop} />
+                <View style={[styles.skeletonLine, { width: '80%' }]} />
+                <View style={[styles.skeletonLine, { width: '50%' }]} />
+            </View>
+        </Animated.View>
+    );
+}
 
 export default function EventsScreen() {
     const [activeTab, setActiveTab] = useState(0);
@@ -46,10 +106,31 @@ export default function EventsScreen() {
     const featured = filtered.length > 0 && searchLower === '' ? filtered[0] : null;
     const rest = searchLower === '' ? filtered.slice(1) : filtered;
 
+    const [isLoading, setIsLoading] = useState(true);
+    useEffect(() => {
+        const t = setTimeout(() => setIsLoading(false), 1200);
+        return () => clearTimeout(t);
+    }, []);
+
+    const listData = isLoading
+        ? Array.from({ length: 5 }).map((_, i) => ({ id: `skel-${i}`, isSkeleton: true } as any))
+        : rest;
+
+    const scrollRef = useAnimatedRef<Animated.FlatList<any>>();
+    const scrollOffset = useScrollViewOffset(scrollRef);
+
+    const headerAnimatedStyle = useAnimatedStyle(() => {
+        return {
+            marginTop: interpolate(scrollOffset.value, [0, 60], [0, -60], Extrapolation.CLAMP),
+            transform: [{ translateY: interpolate(scrollOffset.value, [0, 60], [0, -60], Extrapolation.CLAMP) }],
+            opacity: interpolate(scrollOffset.value, [0, 40], [1, 0], Extrapolation.CLAMP),
+        };
+    });
+
     return (
         <SafeAreaView style={styles.safe} edges={['top']}>
             {/* Header */}
-            <View style={styles.header}>
+            <Animated.View style={[styles.header, headerAnimatedStyle, { overflow: 'hidden' }]}>
                 {isSearching ? (
                     <View style={styles.searchBarActive}>
                         <Ionicons name="search" size={18} color={Colors.textTertiary} />
@@ -73,7 +154,7 @@ export default function EventsScreen() {
                         </TouchableOpacity>
                     </>
                 )}
-            </View>
+            </Animated.View>
 
             {/* Tabs */}
             <View style={styles.tabRow}>
@@ -116,21 +197,26 @@ export default function EventsScreen() {
                 </ScrollView>
             </View>
 
-            <FlatList
-                data={rest}
+            <Animated.FlatList
+                ref={scrollRef as any}
+                data={listData}
                 keyExtractor={(e) => e.id}
                 showsVerticalScrollIndicator={false}
+                scrollEventThrottle={16}
                 contentContainerStyle={styles.list}
                 ListHeaderComponent={
-                    featured ? (
-                        <TouchableOpacity
-                            activeOpacity={0.92}
+                    isLoading ? (
+                        <View style={[styles.featuredCard, { height: 240, backgroundColor: Colors.surface, opacity: 0.5 }]} />
+                    ) : featured ? (
+                        <SpringCard
+                            delay={0}
+                            entering={FadeInDown}
                             onPress={() => router.push(`/event/${featured.id}` as any)}
                             style={styles.featuredCard}
                         >
                             <View style={[styles.featuredHero, { backgroundColor: featured.colorBg ?? '#1A1A2E' }]}>
                                 {/* Gradient overlay via dark-to-transparent via absolute view */}
-                                <View style={styles.featuredOverlay} />
+                                <LinearGradient colors={['transparent', 'rgba(0,0,0,0.85)']} style={styles.featuredOverlay} />
                                 <View style={styles.featuredContent}>
                                     <TagPill label={featured.category} variant="dark" size="sm" />
                                     <View style={styles.featuredBottom}>
@@ -155,36 +241,44 @@ export default function EventsScreen() {
                                     </View>
                                 </View>
                             </View>
-                        </TouchableOpacity>
+                        </SpringCard>
                     ) : null
                 }
-                renderItem={({ item }) => (
-                    <TouchableOpacity
-                        activeOpacity={0.88}
-                        onPress={() => router.push(`/event/${item.id}` as any)}
-                    >
-                        <Card style={styles.eventRow} padding={0} shadow="sm">
-                            {/* Left image block */}
-                            <View style={[styles.eventRowImage, { backgroundColor: item.colorBg ?? '#1A1A2E' }]}>
-                                <Text style={styles.eventRowEmoji}>{item.emoji ?? '🎉'}</Text>
-                            </View>
-                            {/* Content */}
-                            <View style={styles.eventRowContent}>
-                                <View style={styles.eventRowTop}>
-                                    <TagPill label={item.category} variant="blue" size="sm" />
-                                    {item.seatsLeft < 30 && (
-                                        <Text style={styles.seatsLeft}>⚡ {item.seatsLeft} left</Text>
-                                    )}
+                renderItem={({ item, index }) => {
+                    if (item.isSkeleton) return <SkeletonCard />;
+                    return (
+                        <SpringCard
+                            delay={index * 50}
+                            onPress={() => router.push(`/event/${item.id}` as any)}
+                        >
+                            <Card style={styles.eventRow} padding={0} shadow="sm">
+                                {/* Left image block */}
+                                <LinearGradient
+                                    colors={[item.colorBg ?? '#1A1A2E', '#000000']}
+                                    start={{ x: 0, y: 0 }}
+                                    end={{ x: 0, y: 1 }}
+                                    style={styles.eventRowImage}
+                                >
+                                    <Text style={styles.eventRowEmoji}>{item.emoji ?? '🎉'}</Text>
+                                </LinearGradient>
+                                {/* Content */}
+                                <View style={styles.eventRowContent}>
+                                    <View style={styles.eventRowTop}>
+                                        <TagPill label={item.category} variant="blue" size="sm" />
+                                        {item.seatsLeft < 30 && (
+                                            <Text style={styles.seatsLeft}>⚡ {item.seatsLeft} left</Text>
+                                        )}
+                                    </View>
+                                    <Text style={styles.eventRowTitle} numberOfLines={2}>{item.title}</Text>
+                                    <Text style={styles.eventRowMeta}>{item.date} · {item.venue}</Text>
+                                    <Text style={styles.eventRowPrice}>
+                                        {item.tickets[0].price === 0 ? 'Free' : `₹${item.tickets[0].price}`}
+                                    </Text>
                                 </View>
-                                <Text style={styles.eventRowTitle} numberOfLines={2}>{item.title}</Text>
-                                <Text style={styles.eventRowMeta}>{item.date} · {item.venue}</Text>
-                                <Text style={styles.eventRowPrice}>
-                                    {item.tickets[0].price === 0 ? 'Free' : `₹${item.tickets[0].price}`}
-                                </Text>
-                            </View>
-                        </Card>
-                    </TouchableOpacity>
-                )}
+                            </Card>
+                        </SpringCard>
+                    )
+                }}
                 ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
             />
         </SafeAreaView>
@@ -312,4 +406,23 @@ const styles = StyleSheet.create({
     eventRowTitle: { ...Typography.h5, color: Colors.text },
     eventRowMeta: { ...Typography.caption, color: Colors.textSecondary },
     eventRowPrice: { ...Typography.label, color: Colors.primary, fontSize: 13, fontWeight: '700' as const },
+    // Skeleton
+    skeletonRow: {
+        flexDirection: 'row',
+        backgroundColor: Colors.cardBg,
+        borderRadius: Radius.lg,
+        padding: Spacing.md,
+        overflow: 'hidden',
+        borderWidth: 1,
+        borderColor: Colors.border,
+    },
+    skeletonImage: {
+        width: 110,
+        height: 120,
+        backgroundColor: Colors.surface,
+        borderRadius: Radius.md,
+    },
+    skeletonContent: { flex: 1, padding: Spacing.md, gap: 12, justifyContent: 'center' },
+    skeletonTop: { width: 60, height: 20, backgroundColor: Colors.surface, borderRadius: Radius.pill },
+    skeletonLine: { height: 16, backgroundColor: Colors.surface, borderRadius: Radius.sm },
 });

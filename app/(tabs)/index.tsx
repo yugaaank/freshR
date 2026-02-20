@@ -1,15 +1,26 @@
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import React, { useState } from 'react';
 import {
   Dimensions,
-  ScrollView,
+  Pressable,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  View,
+  View
 } from 'react-native';
+import Animated, {
+  Extrapolation,
+  FadeInDown,
+  interpolate,
+  useAnimatedRef,
+  useAnimatedStyle,
+  useScrollViewOffset,
+  useSharedValue,
+  withSpring,
+} from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { events } from '../../src/data/events';
 import { campusAlerts } from '../../src/data/homeData';
@@ -27,7 +38,7 @@ const SERVICE_CARDS = [
     subtitle: 'ORDER FROM CAMPUS',
     badge: '3 counters',
     emoji: '🍱',
-    bg: '#FFF3E8',
+    colors: ['#FFE8CC', '#FFF3E8'],
     badgeBg: '#FF6B35',
     route: '/(tabs)/food',
   },
@@ -37,7 +48,7 @@ const SERVICE_CARDS = [
     subtitle: 'WHAT\'S HAPPENING',
     badge: '5 this week',
     emoji: '🎟️',
-    bg: '#EEF2FF',
+    colors: ['#DDE3FF', '#EEF2FF'],
     badgeBg: '#6C63FF',
     route: '/(tabs)/events',
   },
@@ -47,7 +58,7 @@ const SERVICE_CARDS = [
     subtitle: 'YOUR GRADES & CGPA',
     badge: 'CGPA: 8.4',
     emoji: '📚',
-    bg: '#EDFBF3',
+    colors: ['#D1F5D3', '#EDFBF3'],
     badgeBg: '#22C55E',
     route: '/(tabs)/academics',
   },
@@ -57,7 +68,7 @@ const SERVICE_CARDS = [
     subtitle: 'DAILY CHALLENGE',
     badge: '🔥 14-day streak',
     emoji: '💻',
-    bg: '#F0EEFF',
+    colors: ['#D9D3FF', '#F0EEFF'],
     badgeBg: '#7C3AED',
     route: '/coding-challenge',
   },
@@ -67,7 +78,7 @@ const SERVICE_CARDS = [
     subtitle: 'CONNECT WITH TEACHERS',
     badge: 'Quick access',
     emoji: '👩‍🏫',
-    bg: '#FFF0F5',
+    colors: ['#FFD1DE', '#FFF0F5'],
     badgeBg: '#F43F5E',
     route: '/teachers',
   },
@@ -77,7 +88,7 @@ const SERVICE_CARDS = [
     subtitle: 'FIND YOUR WAY',
     badge: 'Navigate',
     emoji: '🗺️',
-    bg: '#F0FAFB',
+    colors: ['#D3F1F5', '#F0FAFB'],
     badgeBg: '#0891B2',
     route: '/campus-map',
   },
@@ -90,10 +101,41 @@ function greeting() {
   return 'Good evening';
 }
 
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+
+function SpringCard({ children, style, onPress, delay = 0, ...props }: any) {
+  const scale = useSharedValue(1);
+  const animatedStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
+
+  return (
+    <AnimatedPressable
+      onPressIn={() => { scale.value = withSpring(0.96, { damping: 15, stiffness: 200 }); }}
+      onPressOut={() => { scale.value = withSpring(1, { damping: 15, stiffness: 200 }); }}
+      onPress={onPress}
+      style={[style, animatedStyle]}
+      entering={FadeInDown.delay(delay).springify()}
+      {...props}
+    >
+      {children}
+    </AnimatedPressable>
+  );
+}
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function HomeScreen() {
   const [search, setSearch] = useState('');
+
+  const scrollRef = useAnimatedRef<Animated.ScrollView>();
+  const scrollOffset = useScrollViewOffset(scrollRef);
+
+  const headerAnimatedStyle = useAnimatedStyle(() => {
+    return {
+      marginTop: interpolate(scrollOffset.value, [0, 80], [0, -80], Extrapolation.CLAMP),
+      transform: [{ translateY: interpolate(scrollOffset.value, [0, 80], [0, -80], Extrapolation.CLAMP) }],
+      opacity: interpolate(scrollOffset.value, [0, 40], [1, 0], Extrapolation.CLAMP),
+    };
+  });
 
   const searchLower = search.trim().toLowerCase();
 
@@ -108,19 +150,27 @@ export default function HomeScreen() {
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       {/* ═══ BLINKIT-STYLE HEADER ═══ */}
-      <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          <TouchableOpacity style={styles.locationRow}>
-            <Ionicons name="location" size={16} color={Colors.primary} />
-            <Text style={styles.locationText}>Main Campus</Text>
-            <Ionicons name="chevron-down" size={14} color={Colors.text} />
-          </TouchableOpacity>
-          <Text style={styles.greeting}>{greeting()}, Yugan 👋</Text>
+      <Animated.View style={[{ overflow: 'hidden' }, headerAnimatedStyle]}>
+        <LinearGradient
+          colors={['#FFFFFF', '#FAFAFA']}
+          style={StyleSheet.absoluteFill}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 0, y: 1 }}
+        />
+        <View style={styles.header}>
+          <View style={styles.headerLeft}>
+            <View style={styles.locationRow}>
+              <Ionicons name="location" size={16} color={Colors.primary} />
+              <Text style={styles.locationText}>Main Campus</Text>
+              <Ionicons name="chevron-down" size={14} color={Colors.text} />
+            </View>
+            <Text style={styles.greeting}>{greeting()}, Yugan 👋</Text>
+          </View>
+          <View style={styles.avatarBtn}>
+            <Ionicons name="person" size={22} color={Colors.textSecondary} />
+          </View>
         </View>
-        <TouchableOpacity style={styles.avatarBtn}>
-          <Ionicons name="person" size={22} color={Colors.textSecondary} />
-        </TouchableOpacity>
-      </View>
+      </Animated.View>
 
       {/* ═══ BLINKIT-STYLE SEARCH BAR ═══ */}
       <View style={styles.searchWrap}>
@@ -137,35 +187,41 @@ export default function HomeScreen() {
         </View>
       </View>
 
-      <ScrollView
+      <Animated.ScrollView
+        ref={scrollRef as any}
         showsVerticalScrollIndicator={false}
+        scrollEventThrottle={16}
         contentContainerStyle={styles.scroll}
       >
         {/* ═══ PROMO BANNER (Blinkit ₹50 OFF style) ═══ */}
-        <View style={styles.promoBanner}>
-          <View style={styles.promoLeft}>
-            <Text style={styles.promoSmall}>TODAY'S HIGHLIGHT</Text>
-            <Text style={styles.promoTitle}>HackMIT{'\n'}This Weekend 🚀</Text>
-            <TouchableOpacity
-              style={styles.promoCta}
-              onPress={() => router.push('/(tabs)/events')}
-            >
-              <Text style={styles.promoCtaText}>REGISTER NOW</Text>
-            </TouchableOpacity>
-          </View>
-          <Text style={styles.promoEmoji}>🏆</Text>
-        </View>
+        <SpringCard style={styles.promoBannerWrap} delay={100} onPress={() => router.push('/(tabs)/events')}>
+          <LinearGradient
+            colors={['#1A5C3A', '#0D3D27']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.promoBanner}
+          >
+            <View style={styles.promoLeft}>
+              <Text style={styles.promoSmall}>TODAY'S HIGHLIGHT</Text>
+              <Text style={styles.promoTitle}>HackMIT{'\n'}This Weekend 🚀</Text>
+              <View style={styles.promoCta}>
+                <Text style={styles.promoCtaText}>REGISTER NOW</Text>
+              </View>
+            </View>
+            <Text style={styles.promoEmoji}>🏆</Text>
+          </LinearGradient>
+        </SpringCard>
 
         {/* ═══ CAMPUS ALERTS ═══ */}
-        {campusAlerts.map((alert) => (
-          <TouchableOpacity key={alert.id} style={styles.alertRow} activeOpacity={0.85}>
+        {campusAlerts.map((alert, idx) => (
+          <SpringCard key={alert.id} delay={150 + idx * 50} style={styles.alertRow}>
             <Text style={styles.alertEmoji}>{alert.emoji}</Text>
             <View style={styles.alertText}>
               <Text style={styles.alertTitle}>{alert.title}</Text>
               <Text style={styles.alertDesc}>{alert.description}</Text>
             </View>
             <Ionicons name="chevron-forward" size={16} color={Colors.primary} />
-          </TouchableOpacity>
+          </SpringCard>
         ))}
 
         {/* ═══ SWIGGY-STYLE SERVICES GRID ═══ */}
@@ -173,22 +229,29 @@ export default function HomeScreen() {
           <>
             <Text style={styles.sectionTitle}>What would you like?</Text>
             <View style={styles.grid}>
-              {filteredCards.map((card) => (
-                <TouchableOpacity
+              {filteredCards.map((card, idx) => (
+                <SpringCard
                   key={card.id}
-                  style={[styles.card, { backgroundColor: card.bg }]}
-                  activeOpacity={0.88}
+                  delay={200 + idx * 50}
                   onPress={() => router.push(card.route as any)}
+                  style={styles.cardWrap}
                 >
-                  <View>
-                    <Text style={styles.cardTitle}>{card.title}</Text>
-                    <Text style={styles.cardSubtitle}>{card.subtitle}</Text>
-                    <View style={[styles.cardBadge, { backgroundColor: card.badgeBg }]}>
-                      <Text style={styles.cardBadgeText}>{card.badge}</Text>
+                  <LinearGradient
+                    colors={card.colors as [string, string]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.card}
+                  >
+                    <View>
+                      <Text style={styles.cardTitle}>{card.title}</Text>
+                      <Text style={styles.cardSubtitle}>{card.subtitle}</Text>
+                      <View style={[styles.cardBadge, { backgroundColor: card.badgeBg }]}>
+                        <Text style={styles.cardBadgeText}>{card.badge}</Text>
+                      </View>
                     </View>
-                  </View>
-                  <Text style={styles.cardEmoji}>{card.emoji}</Text>
-                </TouchableOpacity>
+                    <Text style={styles.cardEmoji}>{card.emoji}</Text>
+                  </LinearGradient>
+                </SpringCard>
               ))}
             </View>
           </>
@@ -203,54 +266,68 @@ export default function HomeScreen() {
                 <Text style={styles.seeAll}>See all →</Text>
               </TouchableOpacity>
             </View>
-            <ScrollView
+            <Animated.ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.eventStrip}
             >
-              {filteredEvents.map((ev) => (
-                <TouchableOpacity
+              {filteredEvents.map((ev, idx) => (
+                <SpringCard
                   key={ev.id}
-                  style={[styles.eventCard, { backgroundColor: ev.colorBg ?? '#1C1C1E' }]}
-                  activeOpacity={0.88}
+                  delay={250 + idx * 50}
+                  style={styles.eventCardWrap}
                 >
-                  <View style={styles.eventTop}>
-                    <View style={styles.eventCatPill}>
-                      <Text style={styles.eventCatText}>{ev.category}</Text>
-                    </View>
-                    {ev.seatsLeft <= 15 && (
-                      <View style={styles.urgencyPill}>
-                        <Text style={styles.urgencyText}>⚡ {ev.seatsLeft} left</Text>
+                  <LinearGradient
+                    colors={[ev.colorBg ?? '#1C1C1E', '#000000']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 0, y: 1 }}
+                    style={styles.eventCard}
+                  >
+                    <View style={styles.eventTop}>
+                      <View style={styles.eventCatPill}>
+                        <Text style={styles.eventCatText}>{ev.category}</Text>
                       </View>
-                    )}
-                  </View>
-                  <View style={styles.eventBottom}>
-                    <Text style={styles.eventEmoji}>{ev.emoji ?? '📅'}</Text>
-                    <Text style={styles.eventTitle} numberOfLines={2}>{ev.title}</Text>
-                    <Text style={styles.eventMeta}>📅 {ev.date} · {ev.time}</Text>
-                  </View>
-                </TouchableOpacity>
+                      {ev.seatsLeft <= 15 && (
+                        <View style={styles.urgencyPill}>
+                          <Text style={styles.urgencyText}>⚡ {ev.seatsLeft} left</Text>
+                        </View>
+                      )}
+                    </View>
+                    <View style={styles.eventBottom}>
+                      <Text style={styles.eventEmoji}>{ev.emoji ?? '📅'}</Text>
+                      <Text style={styles.eventTitle} numberOfLines={2}>{ev.title}</Text>
+                      <Text style={styles.eventMeta}>📅 {ev.date} · {ev.time}</Text>
+                    </View>
+                  </LinearGradient>
+                </SpringCard>
               ))}
-            </ScrollView>
+            </Animated.ScrollView>
           </>
         )}
 
         {/* ═══ CODING STREAK BANNER ═══ */}
-        <TouchableOpacity
-          style={styles.challengeBanner}
-          activeOpacity={0.9}
+        <SpringCard
+          delay={400}
           onPress={() => router.push('/coding-challenge')}
+          style={styles.challengeBannerWrap}
         >
-          <View>
-            <Text style={styles.challengeLabel}>DAILY CHALLENGE ACTIVE</Text>
-            <Text style={styles.challengeTitle}>🔥 14-Day Streak!</Text>
-            <Text style={styles.challengeSub}>Keep it going — solve today's problem</Text>
-          </View>
-          <View style={styles.challengeArrow}>
-            <Ionicons name="arrow-forward" size={18} color="#FFF" />
-          </View>
-        </TouchableOpacity>
-      </ScrollView>
+          <LinearGradient
+            colors={['#8B7FFF', '#4C46D6']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.challengeBanner}
+          >
+            <View>
+              <Text style={styles.challengeLabel}>DAILY CHALLENGE ACTIVE</Text>
+              <Text style={styles.challengeTitle}>🔥 14-Day Streak!</Text>
+              <Text style={styles.challengeSub}>Keep it going — solve today's problem</Text>
+            </View>
+            <View style={styles.challengeArrow}>
+              <Ionicons name="arrow-forward" size={18} color="#FFF" />
+            </View>
+          </LinearGradient>
+        </SpringCard>
+      </Animated.ScrollView>
     </SafeAreaView>
   );
 }
@@ -324,16 +401,17 @@ const styles = StyleSheet.create({
   scroll: { paddingBottom: 110 },
 
   // ── Promo banner (Blinkit ₹50 OFF style) ──
-  promoBanner: {
+  promoBannerWrap: {
     marginHorizontal: Spacing.section,
     marginBottom: Spacing.md,
     borderRadius: Radius.xl,
-    backgroundColor: '#1A5C3A',
+    overflow: 'hidden',
+  },
+  promoBanner: {
     padding: Spacing.xl,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    overflow: 'hidden',
   },
   promoLeft: { flex: 1 },
   promoSmall: { ...Typography.micro, color: 'rgba(255,255,255,0.65)', letterSpacing: 1.5, marginBottom: 4 },
@@ -391,13 +469,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.section,
     gap: CARD_GAP,
   },
-  card: {
+  cardWrap: {
     width: CARD_SIZE,
     height: CARD_SIZE,
     borderRadius: Radius.xl,
+    overflow: 'hidden',
+  },
+  card: {
+    flex: 1,
     padding: Spacing.md,
     justifyContent: 'space-between',
-    overflow: 'hidden',
   },
   cardTitle: {
     fontSize: 13,
@@ -435,10 +516,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.section,
     gap: 12,
   },
-  eventCard: {
+  eventCardWrap: {
     width: 200,
     height: 160,
     borderRadius: Radius.xl,
+    overflow: 'hidden',
+  },
+  eventCard: {
+    flex: 1,
     padding: Spacing.md,
     justifyContent: 'space-between',
   },
@@ -463,16 +548,18 @@ const styles = StyleSheet.create({
   eventMeta: { ...Typography.micro, color: 'rgba(255,255,255,0.7)' },
 
   // ── Coding challenge streak banner ──
-  challengeBanner: {
+  challengeBannerWrap: {
     marginHorizontal: Spacing.section,
     marginTop: Spacing.xl,
     borderRadius: Radius.xl,
-    backgroundColor: '#1C1C2E',
+    ...Shadows.colored('#6C63FF'),
+    overflow: 'hidden',
+  },
+  challengeBanner: {
     padding: Spacing.xl,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    ...Shadows.colored('#6C63FF'),
   },
   challengeLabel: { ...Typography.micro, color: '#6C63FF', letterSpacing: 1.5, marginBottom: 4 },
   challengeTitle: { ...Typography.h3, color: '#FFF' },

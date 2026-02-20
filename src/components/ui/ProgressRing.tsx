@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
+import Animated, { Easing, useAnimatedProps, useSharedValue, withTiming } from 'react-native-reanimated';
 import Svg, { Circle } from 'react-native-svg';
 import { Colors, Typography } from '../../theme';
 
@@ -12,6 +13,8 @@ interface ProgressRingProps {
     sublabel?: string;
 }
 
+const AnimatedCircle = Animated.createAnimatedComponent(Circle);
+
 export default function ProgressRing({
     progress,
     size = 80,
@@ -22,8 +25,21 @@ export default function ProgressRing({
 }: ProgressRingProps) {
     const radius = (size - strokeWidth) / 2;
     const circumference = 2 * Math.PI * radius;
-    const strokeDashoffset = circumference - (progress / 100) * circumference;
     const center = size / 2;
+
+    const animatedProgress = useSharedValue(0);
+
+    useEffect(() => {
+        animatedProgress.value = withTiming(progress, {
+            duration: 800,
+            easing: Easing.out(Easing.cubic),
+        });
+    }, [progress, animatedProgress]);
+
+    const animatedProps = useAnimatedProps(() => {
+        const strokeDashoffset = circumference - (animatedProgress.value / 100) * circumference;
+        return { strokeDashoffset };
+    });
 
     return (
         <View style={styles.wrapper}>
@@ -36,7 +52,7 @@ export default function ProgressRing({
                     strokeWidth={strokeWidth}
                     fill="none"
                 />
-                <Circle
+                <AnimatedCircle
                     cx={center}
                     cy={center}
                     r={radius}
@@ -44,7 +60,7 @@ export default function ProgressRing({
                     strokeWidth={strokeWidth}
                     fill="none"
                     strokeDasharray={circumference}
-                    strokeDashoffset={strokeDashoffset}
+                    animatedProps={animatedProps}
                     strokeLinecap="round"
                 />
             </Svg>

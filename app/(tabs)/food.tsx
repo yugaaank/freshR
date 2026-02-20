@@ -1,9 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
+import { BlurView } from 'expo-blur';
 import React, { useState } from 'react';
 import {
     Dimensions,
     FlatList,
     Image,
+    Pressable,
     ScrollView,
     StyleSheet,
     Text,
@@ -11,6 +13,7 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
+import Animated, { FadeInDown, useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { menuCategories, menuItems, restaurants } from '../../src/data/food';
 import { useCartStore } from '../../src/store/cartStore';
@@ -18,6 +21,26 @@ import { Colors, Radius, Shadows, Spacing, Typography } from '../../src/theme';
 
 const { width: SW } = Dimensions.get('window');
 const ITEM_W = (SW - Spacing.section * 2 - 12) / 2;
+
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+
+function SpringCard({ children, style, onPress, delay = 0, ...props }: any) {
+    const scale = useSharedValue(1);
+    const animatedStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
+
+    return (
+        <AnimatedPressable
+            onPressIn={() => { scale.value = withSpring(0.96, { damping: 15, stiffness: 200 }); }}
+            onPressOut={() => { scale.value = withSpring(1, { damping: 15, stiffness: 200 }); }}
+            onPress={onPress}
+            style={[style, animatedStyle]}
+            entering={FadeInDown.delay(delay).springify()}
+            {...props}
+        >
+            {children}
+        </AnimatedPressable>
+    );
+}
 
 export default function FoodScreen() {
     const [activeRestaurantId, setActiveRestaurantId] = useState(restaurants[0].id);
@@ -68,7 +91,7 @@ export default function FoodScreen() {
             </View>
 
             {/* ═══ RESTAURANT INFO CARD (Blinkit floating card) ═══ */}
-            <View style={styles.infoCard}>
+            <SpringCard delay={100} style={styles.infoCard}>
                 <View style={styles.infoCardTop}>
                     <View style={styles.infoLeft}>
                         <Text style={styles.infoName}>{restaurant.name}</Text>
@@ -86,7 +109,7 @@ export default function FoodScreen() {
                     </View>
                     <Text style={styles.offerDesc}>No delivery charge on all orders</Text>
                 </View>
-            </View>
+            </SpringCard>
 
             {/* ═══ SEARCH + FILTERS ═══ */}
             <View style={styles.searchRow}>
@@ -153,61 +176,63 @@ export default function FoodScreen() {
                 showsVerticalScrollIndicator={false}
                 columnWrapperStyle={styles.row}
                 contentContainerStyle={styles.grid}
-                renderItem={({ item }) => {
+                renderItem={({ item, index }) => {
                     const qty = cart.items.find((c) => c.item.id === item.id)?.quantity ?? 0;
                     return (
-                        <View style={styles.menuCard}>
-                            {/* Food image */}
-                            <View style={styles.imageWrap}>
-                                <Image
-                                    source={{ uri: item.image }}
-                                    style={styles.foodImage}
-                                    resizeMode="cover"
-                                    defaultSource={{ uri: 'https://via.placeholder.com/200x160/F2F2F7/999999?text=🍽' }}
-                                />
-                                {/* Veg / NonVeg indicator */}
-                                <View style={[styles.vegIndicator, { borderColor: item.isVeg ? '#22C55E' : '#EF4444' }]}>
-                                    <View style={[styles.vegIndicatorDot, { backgroundColor: item.isVeg ? '#22C55E' : '#EF4444' }]} />
-                                </View>
-                                {/* Rating chip */}
-                                <View style={styles.ratingChip}>
-                                    <Ionicons name="star" size={9} color="#FFD60A" />
-                                    <Text style={styles.ratingChipText}>{item.rating}</Text>
-                                </View>
-                                {item.isPopular && (
-                                    <View style={styles.popularChip}>
-                                        <Text style={styles.popularChipText}>🔥 Popular</Text>
+                        <SpringCard delay={150 + index * 50} style={styles.menuCardWrap}>
+                            <View style={styles.menuCard}>
+                                {/* Food image */}
+                                <View style={styles.imageWrap}>
+                                    <Image
+                                        source={{ uri: item.image }}
+                                        style={styles.foodImage}
+                                        resizeMode="cover"
+                                        defaultSource={{ uri: 'https://via.placeholder.com/200x160/F2F2F7/999999?text=🍽' }}
+                                    />
+                                    {/* Veg / NonVeg indicator */}
+                                    <View style={[styles.vegIndicator, { borderColor: item.isVeg ? '#22C55E' : '#EF4444' }]}>
+                                        <View style={[styles.vegIndicatorDot, { backgroundColor: item.isVeg ? '#22C55E' : '#EF4444' }]} />
                                     </View>
-                                )}
-                            </View>
-                            {/* Item info */}
-                            <View style={styles.itemInfo}>
-                                <Text style={styles.itemName} numberOfLines={1}>{item.name}</Text>
-                                <Text style={styles.itemDesc} numberOfLines={1}>{item.description}</Text>
-                                <View style={styles.itemBottom}>
-                                    <Text style={styles.itemPrice}>₹{item.price}</Text>
-                                    {qty === 0 ? (
-                                        <TouchableOpacity
-                                            style={styles.addBtn}
-                                            onPress={() => cart.addItem(item, item.restaurantId)}
-                                            activeOpacity={0.85}
-                                        >
-                                            <Text style={styles.addBtnText}>ADD</Text>
-                                        </TouchableOpacity>
-                                    ) : (
-                                        <View style={styles.qtyCtrl}>
-                                            <TouchableOpacity onPress={() => cart.decrementItem(item.id)} style={styles.qtyBtn}>
-                                                <Ionicons name="remove" size={12} color={Colors.primary} />
-                                            </TouchableOpacity>
-                                            <Text style={styles.qtyText}>{qty}</Text>
-                                            <TouchableOpacity onPress={() => cart.addItem(item, item.restaurantId)} style={styles.qtyBtn}>
-                                                <Ionicons name="add" size={12} color={Colors.primary} />
-                                            </TouchableOpacity>
+                                    {/* Rating chip */}
+                                    <View style={styles.ratingChip}>
+                                        <Ionicons name="star" size={9} color="#FFD60A" />
+                                        <Text style={styles.ratingChipText}>{item.rating}</Text>
+                                    </View>
+                                    {item.isPopular && (
+                                        <View style={styles.popularChip}>
+                                            <Text style={styles.popularChipText}>🔥 Popular</Text>
                                         </View>
                                     )}
                                 </View>
+                                {/* Item info */}
+                                <View style={styles.itemInfo}>
+                                    <Text style={styles.itemName} numberOfLines={1}>{item.name}</Text>
+                                    <Text style={styles.itemDesc} numberOfLines={1}>{item.description}</Text>
+                                    <View style={styles.itemBottom}>
+                                        <Text style={styles.itemPrice}>₹{item.price}</Text>
+                                        {qty === 0 ? (
+                                            <TouchableOpacity
+                                                style={styles.addBtn}
+                                                onPress={() => cart.addItem(item, item.restaurantId)}
+                                                activeOpacity={0.85}
+                                            >
+                                                <Text style={styles.addBtnText}>ADD</Text>
+                                            </TouchableOpacity>
+                                        ) : (
+                                            <View style={styles.qtyCtrl}>
+                                                <TouchableOpacity onPress={() => cart.decrementItem(item.id)} style={styles.qtyBtn}>
+                                                    <Ionicons name="remove" size={12} color={Colors.primary} />
+                                                </TouchableOpacity>
+                                                <Text style={styles.qtyText}>{qty}</Text>
+                                                <TouchableOpacity onPress={() => cart.addItem(item, item.restaurantId)} style={styles.qtyBtn}>
+                                                    <Ionicons name="add" size={12} color={Colors.primary} />
+                                                </TouchableOpacity>
+                                            </View>
+                                        )}
+                                    </View>
+                                </View>
                             </View>
-                        </View>
+                        </SpringCard>
                     );
                 }}
             />
@@ -215,14 +240,16 @@ export default function FoodScreen() {
             {/* ═══ CART BAR ═══ */}
             {cartCount > 0 && (
                 <View style={styles.cartBarWrap}>
-                    <TouchableOpacity style={styles.cartBar} activeOpacity={0.92}>
-                        <View style={styles.cartLeft}>
-                            <View style={styles.cartBadge}>
-                                <Text style={styles.cartBadgeText}>{cartCount}</Text>
+                    <TouchableOpacity activeOpacity={0.92}>
+                        <BlurView intensity={80} tint="dark" style={styles.cartBar}>
+                            <View style={styles.cartLeft}>
+                                <View style={styles.cartBadge}>
+                                    <Text style={styles.cartBadgeText}>{cartCount}</Text>
+                                </View>
+                                <Text style={styles.cartLabel}>View Cart</Text>
                             </View>
-                            <Text style={styles.cartLabel}>View Cart</Text>
-                        </View>
-                        <Text style={styles.cartPrice}>₹{cartTotal}</Text>
+                            <Text style={styles.cartPrice}>₹{cartTotal}</Text>
+                        </BlurView>
                     </TouchableOpacity>
                 </View>
             )}
@@ -374,12 +401,16 @@ const styles = StyleSheet.create({
     // 2-column grid
     grid: { paddingHorizontal: Spacing.section, paddingTop: Spacing.sm, paddingBottom: 100 },
     row: { gap: 12, marginBottom: 12 },
-    menuCard: {
+    menuCardWrap: {
         width: ITEM_W,
+        borderRadius: Radius.lg,
+        ...Shadows.sm,
+    },
+    menuCard: {
+        flex: 1,
         backgroundColor: '#FFF',
         borderRadius: Radius.lg,
         overflow: 'hidden',
-        ...Shadows.sm,
     },
 
     // Food image
@@ -462,10 +493,10 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        backgroundColor: Colors.primary,
         borderRadius: Radius.lg,
         padding: Spacing.lg,
-        ...Shadows.colored(Colors.primary),
+        overflow: 'hidden',
+        backgroundColor: 'rgba(0,0,0,0.65)', // Semi-transparent overlay to mix with dark tint
     },
     cartLeft: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
     cartBadge: {

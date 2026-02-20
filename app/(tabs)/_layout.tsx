@@ -1,6 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
+import { useEffect } from 'react';
 import { Platform, StyleSheet, Text, View } from 'react-native';
+import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 import { useCartStore } from '../../src/store/cartStore';
 import { Colors, Spacing, Typography } from '../../src/theme';
 
@@ -12,6 +14,19 @@ interface TabIconProps {
 }
 
 function TabIcon({ name, label, focused, badge }: TabIconProps) {
+  const dotWidth = useSharedValue(focused ? 16 : 4);
+  const dotOpacity = useSharedValue(focused ? 1 : 0);
+
+  useEffect(() => {
+    dotWidth.value = withSpring(focused ? 16 : 4, { damping: 12, stiffness: 150 });
+    dotOpacity.value = withSpring(focused ? 1 : 0, { damping: 12, stiffness: 150 });
+  }, [focused, dotWidth, dotOpacity]);
+
+  const dotStyle = useAnimatedStyle(() => ({
+    width: dotWidth.value,
+    opacity: dotOpacity.value,
+  }));
+
   return (
     <View style={styles.iconWrap}>
       <View style={styles.iconContainer}>
@@ -24,7 +39,7 @@ function TabIcon({ name, label, focused, badge }: TabIconProps) {
       </View>
       <Text style={[styles.tabLabel, focused && styles.tabLabelFocused]} numberOfLines={1}>{label}</Text>
       {/* Active indicator dot */}
-      {focused && <View style={styles.activeDot} />}
+      <Animated.View style={[styles.activeDot, dotStyle]} />
     </View>
   );
 }
@@ -121,7 +136,6 @@ const styles = StyleSheet.create({
   tabLabel: { ...Typography.micro, color: Colors.textTertiary },
   tabLabelFocused: { color: Colors.primary, fontWeight: '700' },
   activeDot: {
-    width: 4,
     height: 4,
     borderRadius: 2,
     backgroundColor: Colors.primary,
