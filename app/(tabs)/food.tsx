@@ -3,7 +3,6 @@ import { BlurView } from 'expo-blur';
 import React, { useState } from 'react';
 import {
     Dimensions,
-    FlatList,
     Image,
     Pressable,
     ScrollView,
@@ -11,9 +10,9 @@ import {
     Text,
     TextInput,
     TouchableOpacity,
-    View,
+    View
 } from 'react-native';
-import Animated, { FadeInDown, useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
+import Animated, { Extrapolation, FadeInDown, interpolate, useAnimatedScrollHandler, useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { menuCategories, menuItems, restaurants } from '../../src/data/food';
 import { useCartStore } from '../../src/store/cartStore';
@@ -64,8 +63,74 @@ export default function FoodScreen() {
     const cartCount = cart.totalItems();
     const cartTotal = cart.totalPrice();
 
+    const scrollY = useSharedValue(0);
+    const scrollHandler = useAnimatedScrollHandler({
+        onScroll: (event) => {
+            scrollY.value = event.contentOffset.y;
+        },
+    });
+
+    const stickyHeaderStyle = useAnimatedStyle(() => {
+        const translateY = interpolate(
+            scrollY.value,
+            [0, 200, 250],
+            [-100, -100, 0],
+            Extrapolation.CLAMP
+        );
+        const opacity = interpolate(
+            scrollY.value,
+            [0, 200, 250],
+            [0, 0, 1],
+            Extrapolation.CLAMP
+        );
+        return {
+            transform: [{ translateY }],
+            opacity,
+        };
+    });
+
     return (
         <SafeAreaView style={styles.safe} edges={['top']}>
+            {/* ═══ STICKY FILTER HEADER ═══ */}
+            <Animated.View style={[styles.stickyHeader, stickyHeaderStyle]}>
+                <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.filterBar}
+                >
+                    <TouchableOpacity
+                        style={[styles.vegToggle, vegOnly && styles.vegToggleActive]}
+                        onPress={() => { setVegOnly(!vegOnly); setNonVegOnly(false); }}
+                        activeOpacity={0.85}
+                    >
+                        <View style={styles.vegBadgeIcon}>
+                            <View style={styles.vegDot} />
+                        </View>
+                        <Text style={styles.vegToggleText}>Veg</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        style={[styles.nonVegToggle, nonVegOnly && styles.nonVegToggleActive]}
+                        onPress={() => { setNonVegOnly(!nonVegOnly); setVegOnly(false); }}
+                        activeOpacity={0.85}
+                    >
+                        <View style={styles.nonVegBadgeIcon}>
+                            <View style={styles.nonVegDot} />
+                        </View>
+                        <Text style={styles.vegToggleText}>Non-veg</Text>
+                    </TouchableOpacity>
+                    {['All', ...menuCategories.map((c) => c.name)].map((cat) => (
+                        <TouchableOpacity
+                            key={`sticky-${cat}`}
+                            style={[styles.catChip, activeCategory === cat && styles.catChipActive]}
+                            onPress={() => setActiveCategory(cat)}
+                            activeOpacity={0.85}
+                        >
+                            <Text style={[styles.catText, activeCategory === cat && styles.catTextActive]}>{cat}</Text>
+                        </TouchableOpacity>
+                    ))}
+                </ScrollView>
+            </Animated.View>
+
             {/* ═══ RESTAURANT TABS (Blinkit-style top switcher) ═══ */}
             <View style={styles.tabBar}>
                 <View style={styles.restTabsWrap}>
@@ -138,7 +203,9 @@ export default function FoodScreen() {
                         onPress={() => { setVegOnly(!vegOnly); setNonVegOnly(false); }}
                         activeOpacity={0.85}
                     >
-                        <View style={styles.vegDot} />
+                        <View style={styles.vegBadgeIcon}>
+                            <View style={styles.vegDot} />
+                        </View>
                         <Text style={styles.vegToggleText}>Veg</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
@@ -146,7 +213,9 @@ export default function FoodScreen() {
                         onPress={() => { setNonVegOnly(!nonVegOnly); setVegOnly(false); }}
                         activeOpacity={0.85}
                     >
-                        <View style={styles.nonVegDot} />
+                        <View style={styles.nonVegBadgeIcon}>
+                            <View style={styles.nonVegDot} />
+                        </View>
                         <Text style={styles.vegToggleText}>Non-veg</Text>
                     </TouchableOpacity>
                     {['All', ...menuCategories.map((c) => c.name)].map((cat) => (
@@ -169,26 +238,33 @@ export default function FoodScreen() {
             </View>
 
             {/* ═══ 2-COLUMN MENU GRID (Blinkit style) ═══ */}
-            <FlatList
+            <Animated.FlatList
                 data={filtered}
-                keyExtractor={(item) => item.id}
+                onScroll={scrollHandler}
+                scrollEventThrottle={16}
+                keyExtractor={(item: any) => item.id}
                 numColumns={2}
                 showsVerticalScrollIndicator={false}
                 columnWrapperStyle={styles.row}
                 contentContainerStyle={styles.grid}
-                renderItem={({ item, index }) => {
+                renderItem={({ item, index }: any) => {
                     const qty = cart.items.find((c) => c.item.id === item.id)?.quantity ?? 0;
                     return (
                         <SpringCard delay={150 + index * 50} style={styles.menuCardWrap}>
                             <View style={styles.menuCard}>
                                 {/* Food image */}
                                 <View style={styles.imageWrap}>
-                                    <Image
-                                        source={{ uri: item.image }}
-                                        style={styles.foodImage}
-                                        resizeMode="cover"
-                                        defaultSource={{ uri: 'https://via.placeholder.com/200x160/F2F2F7/999999?text=🍽' }}
-                                    />
+                                    {item.image ? (
+                                        <Image
+                                            source={{ uri: item.image }}
+                                            style={styles.foodImage}
+                                            resizeMode="cover"
+                                        />
+                                    ) : (
+                                        <View style={styles.imagePlaceholder}>
+                                            <Ionicons name="restaurant-outline" size={32} color={Colors.borderStrong} />
+                                        </View>
+                                    )}
                                     {/* Veg / NonVeg indicator */}
                                     <View style={[styles.vegIndicator, { borderColor: item.isVeg ? '#22C55E' : '#EF4444' }]}>
                                         <View style={[styles.vegIndicatorDot, { backgroundColor: item.isVeg ? '#22C55E' : '#EF4444' }]} />
@@ -260,7 +336,20 @@ export default function FoodScreen() {
 // ─── Styles ──────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-    safe: { flex: 1, backgroundColor: '#F5F5F5' },
+    safe: { flex: 1, backgroundColor: '#F5F5F5', position: 'relative' },
+    stickyHeader: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        zIndex: 50,
+        backgroundColor: '#FFF',
+        borderBottomWidth: 1,
+        borderBottomColor: Colors.border,
+        paddingTop: Spacing.xl + 20, // push below safe area
+        paddingBottom: Spacing.sm,
+        ...Shadows.sm,
+    },
 
     // Restaurant tabs
     tabBar: {
@@ -374,8 +463,14 @@ const styles = StyleSheet.create({
         borderColor: '#EF4444',
     },
     nonVegToggleActive: { backgroundColor: '#FEE2E2' },
-    vegDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#22C55E' },
-    nonVegDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#EF4444' },
+    vegBadgeIcon: {
+        width: 14, height: 14, borderWidth: 1.5, borderColor: '#22C55E', alignItems: 'center', justifyContent: 'center', borderRadius: 3
+    },
+    nonVegBadgeIcon: {
+        width: 14, height: 14, borderWidth: 1.5, borderColor: '#EF4444', alignItems: 'center', justifyContent: 'center', borderRadius: 3
+    },
+    vegDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#22C55E' },
+    nonVegDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#EF4444' },
     vegToggleText: { ...Typography.micro, color: Colors.textSecondary, fontWeight: '600' as const },
     catChip: {
         paddingHorizontal: 12,
@@ -416,6 +511,7 @@ const styles = StyleSheet.create({
     // Food image
     imageWrap: { width: '100%', height: ITEM_W * 0.75, position: 'relative' },
     foodImage: { width: '100%', height: '100%', backgroundColor: '#F0F0F0' },
+    imagePlaceholder: { width: '100%', height: '100%', backgroundColor: Colors.surface, alignItems: 'center', justifyContent: 'center' },
     vegIndicator: {
         position: 'absolute',
         bottom: 6,

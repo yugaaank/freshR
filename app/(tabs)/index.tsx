@@ -152,7 +152,7 @@ export default function HomeScreen() {
       {/* ═══ BLINKIT-STYLE HEADER ═══ */}
       <Animated.View style={[{ overflow: 'hidden' }, headerAnimatedStyle]}>
         <LinearGradient
-          colors={['#FFFFFF', '#FAFAFA']}
+          colors={['#FFF3E8', '#FFFFFF']}
           style={StyleSheet.absoluteFill}
           start={{ x: 0, y: 0 }}
           end={{ x: 0, y: 1 }}
@@ -213,16 +213,30 @@ export default function HomeScreen() {
         </SpringCard>
 
         {/* ═══ CAMPUS ALERTS ═══ */}
-        {campusAlerts.map((alert, idx) => (
-          <SpringCard key={alert.id} delay={150 + idx * 50} style={styles.alertRow}>
-            <Text style={styles.alertEmoji}>{alert.emoji}</Text>
-            <View style={styles.alertText}>
-              <Text style={styles.alertTitle}>{alert.title}</Text>
-              <Text style={styles.alertDesc}>{alert.description}</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={16} color={Colors.primary} />
-          </SpringCard>
-        ))}
+        {campusAlerts.map((alert, idx) => {
+          let alertBg = '#FFF8F0';
+          let alertBorder = '#FFE8CC';
+          const titleLower = alert.title.toLowerCase();
+
+          if (titleLower.includes('close') || titleLower.includes('urgent') || titleLower.includes('library')) {
+            alertBg = Colors.errorLight;
+            alertBorder = '#FFDCD9';
+          } else if (titleLower.includes('new') || titleLower.includes('menu') || titleLower.includes('available')) {
+            alertBg = Colors.successLight;
+            alertBorder = '#C3F2D6';
+          }
+
+          return (
+            <SpringCard key={alert.id} delay={150 + idx * 50} style={[styles.alertRow, { backgroundColor: alertBg, borderColor: alertBorder }]}>
+              <Text style={styles.alertEmoji}>{alert.emoji}</Text>
+              <View style={styles.alertText}>
+                <Text style={styles.alertTitle}>{alert.title}</Text>
+                <Text style={styles.alertDesc}>{alert.description}</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={16} color={Colors.primary} />
+            </SpringCard>
+          );
+        })}
 
         {/* ═══ SWIGGY-STYLE SERVICES GRID ═══ */}
         {filteredCards.length > 0 && (
@@ -328,6 +342,14 @@ export default function HomeScreen() {
           </LinearGradient>
         </SpringCard>
       </Animated.ScrollView>
+
+      {/* ═══ BOTTOM FADE OVERLAY ═══ */}
+      <View style={styles.bottomFade} pointerEvents="none">
+        <LinearGradient
+          colors={['rgba(255,255,255,0)', '#FFFFFF']}
+          style={StyleSheet.absoluteFill}
+        />
+      </View>
     </SafeAreaView>
   );
 }
@@ -404,7 +426,7 @@ const styles = StyleSheet.create({
   promoBannerWrap: {
     marginHorizontal: Spacing.section,
     marginBottom: Spacing.md,
-    borderRadius: Radius.xl,
+    borderRadius: 24,
     overflow: 'hidden',
   },
   promoBanner: {
@@ -571,5 +593,15 @@ const styles = StyleSheet.create({
     backgroundColor: '#6C63FF',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+
+  // ── Bottom fade ──
+  bottomFade: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 60,
+    zIndex: 10,
   },
 });

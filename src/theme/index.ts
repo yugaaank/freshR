@@ -99,21 +99,21 @@ export const Gradients = {
 
 export const Typography = {
     // Display
-    display: { fontSize: 40, fontWeight: '800' as const, letterSpacing: -1.5 },
-    hero: { fontSize: 32, fontWeight: '800' as const, letterSpacing: -1.0 },
+    display: { fontFamily: 'Sora_800ExtraBold', fontSize: 40, letterSpacing: -1.5 },
+    hero: { fontFamily: 'Sora_800ExtraBold', fontSize: 32, letterSpacing: -1.0 },
     // Headings
-    h1: { fontSize: 28, fontWeight: '800' as const, letterSpacing: -0.8 },
-    h2: { fontSize: 22, fontWeight: '700' as const, letterSpacing: -0.5 },
-    h3: { fontSize: 18, fontWeight: '700' as const, letterSpacing: -0.3 },
-    h4: { fontSize: 16, fontWeight: '600' as const, letterSpacing: -0.2 },
-    h5: { fontSize: 14, fontWeight: '600' as const, letterSpacing: 0 },
+    h1: { fontFamily: 'Sora_800ExtraBold', fontSize: 28, letterSpacing: -0.8 },
+    h2: { fontFamily: 'Sora_700Bold', fontSize: 22, letterSpacing: -0.5 },
+    h3: { fontFamily: 'Sora_700Bold', fontSize: 18, letterSpacing: -0.3 },
+    h4: { fontFamily: 'Sora_600SemiBold', fontSize: 16, letterSpacing: -0.2 },
+    h5: { fontFamily: 'Sora_600SemiBold', fontSize: 14, letterSpacing: 0 },
     // Body
-    body1: { fontSize: 15, fontWeight: '400' as const, lineHeight: 22 },
-    body2: { fontSize: 13, fontWeight: '400' as const, lineHeight: 18 },
+    body1: { fontFamily: 'Sora_400Regular', fontSize: 15, lineHeight: 22 },
+    body2: { fontFamily: 'Sora_400Regular', fontSize: 13, lineHeight: 18 },
     // UI
-    caption: { fontSize: 12, fontWeight: '400' as const },
-    label: { fontSize: 11, fontWeight: '600' as const, letterSpacing: 0.3 },
-    micro: { fontSize: 10, fontWeight: '600' as const, letterSpacing: 0.4 },
+    caption: { fontFamily: 'Sora_400Regular', fontSize: 12 },
+    label: { fontFamily: 'Sora_600SemiBold', fontSize: 11, letterSpacing: 0.3 },
+    micro: { fontFamily: 'Sora_600SemiBold', fontSize: 10, letterSpacing: 0.4 },
     // Mono (code blocks)
     mono: { fontSize: 13, fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace' },
     // Price

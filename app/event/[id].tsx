@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useState } from 'react';
 import {
@@ -24,6 +25,16 @@ export default function EventDetailScreen() {
 
     const ticket = event.tickets[selectedTicket];
 
+    // Derived color for tags
+    const getTagVariant = (tag: string) => {
+        const lower = tag.toLowerCase();
+        if (lower.includes('free')) return 'green';
+        if (lower.includes('mobile')) return 'blue';
+        if (lower.includes('laptop')) return 'orange';
+        if (lower.includes('design') || lower.includes('ui')) return 'purple';
+        return 'grey';
+    };
+
     return (
         <View style={styles.flex}>
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
@@ -46,9 +57,21 @@ export default function EventDetailScreen() {
                             style={{ marginBottom: Spacing.sm }}
                         />
                         <Text style={styles.heroTitle}>{event.title}</Text>
-                        <View style={styles.heroMeta}>
-                            <Ionicons name="people-outline" size={13} color="rgba(255,255,255,0.8)" />
-                            <Text style={styles.heroMetaText}>{event.attendees} attending</Text>
+                        <View style={styles.heroMetaSpacing}>
+                            <View style={styles.heroMeta}>
+                                <Ionicons name="people-outline" size={13} color="rgba(255,255,255,0.8)" />
+                                <Text style={styles.heroMetaText}>{event.attendees} attending</Text>
+                            </View>
+
+                            {/* Who's Attending Avatar Snippet */}
+                            <View style={styles.attendeesSnippet}>
+                                <Image source={{ uri: 'https://i.pravatar.cc/100?img=1' }} style={[styles.avatarStack, { marginLeft: 0 }]} />
+                                <Image source={{ uri: 'https://i.pravatar.cc/100?img=2' }} style={styles.avatarStack} />
+                                <Image source={{ uri: 'https://i.pravatar.cc/100?img=3' }} style={styles.avatarStack} />
+                                <View style={styles.avatarMore}>
+                                    <Text style={styles.avatarMoreText}>+{(event.attendees ?? 42) - 3}</Text>
+                                </View>
+                            </View>
                         </View>
                     </View>
                 </View>
@@ -88,7 +111,7 @@ export default function EventDetailScreen() {
                     {/* Tags */}
                     <View style={styles.tagsRow}>
                         {event.tags.map((tag) => (
-                            <TagPill key={tag} label={tag} variant="grey" size="sm" />
+                            <TagPill key={tag} label={tag} variant={getTagVariant(tag) as any} size="sm" />
                         ))}
                     </View>
 
@@ -119,13 +142,22 @@ export default function EventDetailScreen() {
                 <View style={{ height: 90 }} />
             </ScrollView>
 
-            <BottomActionBar
-                leftLabel={ticket.price === 0 ? 'Free Entry' : `₹${ticket.price}`}
-                leftSubLabel={registered ? '✅ Registered' : `${ticket.available} spots left`}
-                buttonLabel={registered ? 'Registered ✓' : 'Register Now'}
-                onPress={() => setRegistered(true)}
-                disabled={registered}
-            />
+            {/* Sticky Gradient CTA Overlay */}
+            <View style={styles.bottomOverlayWrap} pointerEvents="box-none">
+                <LinearGradient
+                    colors={['rgba(255,255,255,0)', 'rgba(255,255,255,0.8)', '#FFFFFF']}
+                    style={StyleSheet.absoluteFill}
+                    pointerEvents="none"
+                />
+                <BottomActionBar
+                    leftLabel={ticket.price === 0 ? 'Free Entry' : `₹${ticket.price}`}
+                    leftSubLabel={registered ? '✅ Registered' : `${ticket.available} spots left`}
+                    buttonLabel={registered ? 'Registered ✓' : 'Register Now'}
+                    onPress={() => setRegistered(true)}
+                    disabled={registered}
+                    style={{ backgroundColor: 'transparent', borderTopWidth: 0, shadowOpacity: 0, elevation: 0 }}
+                />
+            </View>
         </View>
     );
 }
@@ -216,4 +248,17 @@ const styles = StyleSheet.create({
     ticketType: { ...Typography.body2, color: Colors.text, fontWeight: '600' },
     ticketAvail: { ...Typography.caption, color: Colors.textSecondary },
     ticketPrice: { ...Typography.price, color: Colors.primary },
+    heroMetaSpacing: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 },
+    attendeesSnippet: { flexDirection: 'row', alignItems: 'center' },
+    avatarStack: { width: 24, height: 24, borderRadius: 12, borderWidth: 1.5, borderColor: '#1A1A2E', marginLeft: -8 },
+    avatarMore: { width: 24, height: 24, borderRadius: 12, backgroundColor: Colors.surface, borderWidth: 1.5, borderColor: '#1A1A2E', marginLeft: -8, alignItems: 'center', justifyContent: 'center' },
+    avatarMoreText: { ...Typography.micro, fontSize: 8, color: Colors.text },
+    bottomOverlayWrap: {
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        paddingTop: 40,
+        zIndex: 100,
+    }
 });

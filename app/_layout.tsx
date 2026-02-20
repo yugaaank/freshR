@@ -6,14 +6,35 @@ import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 
+import {
+  Sora_400Regular,
+  Sora_600SemiBold,
+  Sora_700Bold,
+  Sora_800ExtraBold,
+  useFonts,
+} from '@expo-google-fonts/sora';
+
 SplashScreen.preventAutoHideAsync();
 
 const queryClient = new QueryClient();
 
 export default function RootLayout() {
+  const [fontsLoaded] = useFonts({
+    Sora_400Regular,
+    Sora_600SemiBold,
+    Sora_700Bold,
+    Sora_800ExtraBold,
+  });
+
   useEffect(() => {
-    SplashScreen.hideAsync();
-  }, []);
+    if (fontsLoaded) {
+      SplashScreen.hideAsync();
+    }
+  }, [fontsLoaded]);
+
+  if (!fontsLoaded) {
+    return null;
+  }
 
   return (
     <QueryClientProvider client={queryClient}>

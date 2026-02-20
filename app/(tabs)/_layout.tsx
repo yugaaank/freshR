@@ -14,23 +14,24 @@ interface TabIconProps {
 }
 
 function TabIcon({ name, label, focused, badge }: TabIconProps) {
-  const dotWidth = useSharedValue(focused ? 16 : 4);
-  const dotOpacity = useSharedValue(focused ? 1 : 0);
+  const bgOpacity = useSharedValue(focused ? 1 : 0);
+  const scale = useSharedValue(focused ? 1 : 0.8);
 
   useEffect(() => {
-    dotWidth.value = withSpring(focused ? 16 : 4, { damping: 12, stiffness: 150 });
-    dotOpacity.value = withSpring(focused ? 1 : 0, { damping: 12, stiffness: 150 });
-  }, [focused, dotWidth, dotOpacity]);
+    bgOpacity.value = withSpring(focused ? 1 : 0, { damping: 15, stiffness: 300 });
+    scale.value = withSpring(focused ? 1 : 0.8, { damping: 15, stiffness: 300 });
+  }, [focused, bgOpacity, scale]);
 
-  const dotStyle = useAnimatedStyle(() => ({
-    width: dotWidth.value,
-    opacity: dotOpacity.value,
+  const bgStyle = useAnimatedStyle(() => ({
+    opacity: bgOpacity.value,
+    transform: [{ scale: scale.value }],
   }));
 
   return (
     <View style={styles.iconWrap}>
+      <Animated.View style={[styles.activeBg, bgStyle]} />
       <View style={styles.iconContainer}>
-        <Ionicons name={name} size={24} color={focused ? Colors.primary : Colors.textTertiary} />
+        <Ionicons name={name} size={22} color={focused ? Colors.primary : Colors.textTertiary} />
         {badge ? (
           <View style={styles.badge}>
             <Text style={styles.badgeText}>{badge > 99 ? '99+' : badge}</Text>
@@ -38,8 +39,6 @@ function TabIcon({ name, label, focused, badge }: TabIconProps) {
         ) : null}
       </View>
       <Text style={[styles.tabLabel, focused && styles.tabLabelFocused]} numberOfLines={1}>{label}</Text>
-      {/* Active indicator dot */}
-      <Animated.View style={[styles.activeDot, dotStyle]} />
     </View>
   );
 }
@@ -133,12 +132,16 @@ const styles = StyleSheet.create({
     borderColor: Colors.cardBg,
   },
   badgeText: { color: '#FFF', fontSize: 9, fontWeight: '700' },
-  tabLabel: { ...Typography.micro, color: Colors.textTertiary },
+  tabLabel: { ...Typography.micro, color: Colors.textTertiary, marginTop: 2, zIndex: 1 },
   tabLabelFocused: { color: Colors.primary, fontWeight: '700' },
-  activeDot: {
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: Colors.primary,
-    marginTop: 1,
+  activeBg: {
+    position: 'absolute',
+    backgroundColor: Colors.primaryLight,
+    borderRadius: 16,
+    top: -6,
+    bottom: -6,
+    left: -12,
+    right: -12,
+    zIndex: 0,
   },
 });

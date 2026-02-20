@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
+    Image,
     SectionList,
     StyleSheet,
     Text,
@@ -98,9 +99,10 @@ interface MiniCalProps {
     selectedDate: string;
     onSelect: (ds: string) => void;
     eventDates: Set<string>;
+    eventsData: typeof events;
 }
 
-function MiniCal({ year, month, selectedDate, onSelect, eventDates }: MiniCalProps) {
+function MiniCal({ year, month, selectedDate, onSelect, eventDates, eventsData }: MiniCalProps) {
     const totalDays = daysInMonth(year, month);
     const firstDay = firstDayOfMonth(year, month);
 
@@ -151,6 +153,7 @@ function MiniCal({ year, month, selectedDate, onSelect, eventDates }: MiniCalPro
                                     <View style={[
                                         mc.dot,
                                         isToday && mc.dotToday,
+                                        !isToday && { backgroundColor: CAT_COLORS[eventsData.find(e => e.date === ds)?.category ?? 'Tech']?.meta ?? Colors.primary }
                                     ]} />
                                 )}
                             </TouchableOpacity>
@@ -286,6 +289,7 @@ export default function CalendarScreen() {
                         selectedDate={selectedDate}
                         onSelect={handleDaySelect}
                         eventDates={EVENT_DATE_SET}
+                        eventsData={events}
                     />
                 </View>
             )}
@@ -335,7 +339,19 @@ export default function CalendarScreen() {
                         </View>
                     </View>
                 )}
-                renderItem={({ item: ev }) => {
+                ListEmptyComponent={() => (
+                    <View style={styles.emptyState}>
+                        <Image
+                            source={{ uri: 'https://cdn3d.iconscout.com/3d/premium/thumb/empty-box-4200742-3498864.png' }}
+                            style={styles.emptyStateImg}
+                        />
+                        <Text style={styles.emptyStateTitle}>No events on this day</Text>
+                        <Text style={styles.emptyStateSub}>Take a break or check other days!</Text>
+                    </View>
+                )}
+                renderItem={({ item: ev, section }) => {
+                    // Only render if there's actually data
+                    if (section.data.length === 0) return null;
                     const col = CAT_COLORS[ev.category] ?? DEFAULT_CAT;
                     return (
                         <TouchableOpacity
@@ -345,6 +361,7 @@ export default function CalendarScreen() {
                             <View style={[styles.eventCardBg, { backgroundColor: col.bg }]}>
                                 <View style={styles.eventCardTop}>
                                     <View style={[styles.catPill, { backgroundColor: col.border }]}>
+                                        <Ionicons name="pricetag" size={10} color="#FFF" style={{ marginRight: 4 }} />
                                         <Text style={styles.catPillText}>{ev.category}</Text>
                                     </View>
                                     {ev.seatsLeft <= 15 && (
@@ -510,7 +527,9 @@ const styles = StyleSheet.create({
     catPill: {
         borderRadius: Radius.pill,
         paddingHorizontal: 8,
-        paddingVertical: 2,
+        paddingVertical: 3,
+        flexDirection: 'row',
+        alignItems: 'center',
     },
     catPillText: { ...Typography.micro, color: '#FFF', fontWeight: '700' as const, fontSize: 9 },
     urgencyPill: {
@@ -535,4 +554,8 @@ const styles = StyleSheet.create({
         alignItems: 'center', justifyContent: 'center',
         ...Shadows.colored(Colors.primary),
     },
+    emptyState: { alignItems: 'center', justifyContent: 'center', padding: Spacing.xl, marginTop: Spacing.lg },
+    emptyStateImg: { width: 120, height: 120, opacity: 0.8, marginBottom: Spacing.md },
+    emptyStateTitle: { ...Typography.h4, color: Colors.text, marginBottom: 4 },
+    emptyStateSub: { ...Typography.body2, color: Colors.textSecondary, textAlign: 'center' }
 });

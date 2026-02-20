@@ -42,6 +42,11 @@ const CATEGORY_COLORS: Record<string, string> = {
     Cultural: '#AF52DE', Workshop: '#FF9500', Academic: '#5856D6', All: '#6B6B6B',
 };
 
+const CAT_ICONS: Record<string, any> = {
+    Tech: 'laptop-outline', Music: 'musical-notes-outline', Sports: 'football-outline',
+    Cultural: 'color-palette-outline', Workshop: 'hammer-outline', Academic: 'book-outline', All: 'ticket-outline',
+};
+
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 function SpringCard({ children, style, onPress, delay = 0, entering, ...props }: any) {
@@ -184,7 +189,9 @@ export default function EventsScreen() {
                             key={cat}
                             style={[
                                 styles.catChip,
-                                activeCat === cat && { backgroundColor: CATEGORY_COLORS[cat] ?? Colors.primary },
+                                activeCat === cat
+                                    ? { backgroundColor: Colors.primary, borderColor: Colors.primary }
+                                    : { backgroundColor: 'transparent', borderColor: Colors.border }
                             ]}
                             onPress={() => setActiveCat(cat)}
                             activeOpacity={0.88}
@@ -214,7 +221,12 @@ export default function EventsScreen() {
                             onPress={() => router.push(`/event/${featured.id}` as any)}
                             style={styles.featuredCard}
                         >
-                            <View style={[styles.featuredHero, { backgroundColor: featured.colorBg ?? '#1A1A2E' }]}>
+                            <LinearGradient
+                                colors={['#0D3D27', '#000000']}
+                                start={{ x: 0, y: 0 }}
+                                end={{ x: 0, y: 1 }}
+                                style={styles.featuredHero}
+                            >
                                 {/* Gradient overlay via dark-to-transparent via absolute view */}
                                 <LinearGradient colors={['transparent', 'rgba(0,0,0,0.85)']} style={styles.featuredOverlay} />
                                 <View style={styles.featuredContent}>
@@ -240,7 +252,7 @@ export default function EventsScreen() {
                                         </View>
                                     </View>
                                 </View>
-                            </View>
+                            </LinearGradient>
                         </SpringCard>
                     ) : null
                 }
@@ -251,7 +263,7 @@ export default function EventsScreen() {
                             delay={index * 50}
                             onPress={() => router.push(`/event/${item.id}` as any)}
                         >
-                            <Card style={styles.eventRow} padding={0} shadow="sm">
+                            <Card style={StyleSheet.flatten([styles.eventRow, { borderLeftWidth: 4, borderLeftColor: CATEGORY_COLORS[item.category] || Colors.primary }])} padding={0} shadow="sm">
                                 {/* Left image block */}
                                 <LinearGradient
                                     colors={[item.colorBg ?? '#1A1A2E', '#000000']}
@@ -259,7 +271,7 @@ export default function EventsScreen() {
                                     end={{ x: 0, y: 1 }}
                                     style={styles.eventRowImage}
                                 >
-                                    <Text style={styles.eventRowEmoji}>{item.emoji ?? '🎉'}</Text>
+                                    <Ionicons name={CAT_ICONS[item.category] || 'ticket-outline'} size={32} color="rgba(255,255,255,0.9)" />
                                 </LinearGradient>
                                 {/* Content */}
                                 <View style={styles.eventRowContent}>
@@ -354,7 +366,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: 14,
         paddingVertical: 6,
         borderRadius: Radius.pill,
-        backgroundColor: Colors.surface,
+        borderWidth: 1,
         alignSelf: 'center' as const,
     },
     catText: { ...Typography.label, fontSize: 12, color: Colors.textSecondary, fontWeight: '600' as const },

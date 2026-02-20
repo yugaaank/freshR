@@ -50,8 +50,8 @@ export default function AcademicDashboard() {
                             {[
                                 { label: 'SGPA', value: String(academicProfile.sgpa), color: Colors.primary },
                                 { label: 'Credits', value: `${academicProfile.earnedCredits}/${academicProfile.totalCredits}`, color: Colors.success },
+                                { label: 'Attendance', value: '84%', color: '#00C9B1' }, // Added overall attendance here
                                 { label: 'Division', value: academicProfile.division, color: '#FFD60A' },
-                                { label: 'Roll No', value: academicProfile.rollNo, color: 'rgba(255,255,255,0.60)' },
                             ].map((m) => (
                                 <View key={m.label} style={styles.metricItem}>
                                     <Text style={[styles.metricValue, { color: m.color }]}>{m.value}</Text>
@@ -66,14 +66,18 @@ export default function AcademicDashboard() {
                 <SectionHeader title="Subjects" subtitle="Current Semester" style={{ marginTop: Spacing.xl }} />
                 <View style={styles.subjectList}>
                     {subjects.map((subject) => {
-                        const lowAttendance = subject.attendance < 75;
+                        const att = subject.attendance;
+                        let ringColor = Colors.success;
+                        if (att < 75) ringColor = Colors.error;
+                        else if (att < 85) ringColor = Colors.warning;
+
                         const ring = (
                             <ProgressRing
-                                progress={subject.attendance}
-                                size={48}
-                                strokeWidth={4}
-                                color={lowAttendance ? Colors.error : Colors.success}
-                                label={`${subject.attendance}%`}
+                                progress={att}
+                                size={56}
+                                strokeWidth={5}
+                                color={ringColor}
+                                label={`${att}%`}
                             />
                         );
                         return (
@@ -98,7 +102,7 @@ export default function AcademicDashboard() {
                                             size="sm"
                                         />
                                         <Text style={styles.nextClass}>Next: {subject.nextClass}</Text>
-                                        {lowAttendance && (
+                                        {att < 75 && (
                                             <TagPill label="⚠ Low attendance" variant="red" size="sm" />
                                         )}
                                     </View>
