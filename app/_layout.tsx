@@ -46,6 +46,8 @@ export default function RootLayout() {
           <Stack.Screen name="coding-challenge" options={{ headerShown: false }} />
           <Stack.Screen name="teachers" options={{ headerShown: false }} />
           <Stack.Screen name="campus-map" options={{ headerShown: false }} />
+          <Stack.Screen name="print" options={{ headerShown: false }} />
+          <Stack.Screen name="profile" options={{ headerShown: false }} />
           <Stack.Screen name="+not-found" />
         </Stack>
         <StatusBar style="dark" />

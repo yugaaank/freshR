@@ -16,6 +16,7 @@ import Animated, {
   Extrapolation,
   FadeInDown,
   interpolate,
+  Layout,
   useAnimatedRef,
   useAnimatedStyle,
   useScrollViewOffset,
@@ -57,16 +58,6 @@ const SERVICE_CARDS = [
     route: '/(tabs)/explore',
   },
   {
-    id: 'academics',
-    title: 'ACADEMICS',
-    subtitle: 'YOUR GRADES & CGPA',
-    badge: 'CGPA: 8.4',
-    emoji: '📚',
-    colors: ['#D1F5D3', '#EDFBF3'],
-    badgeBg: '#22C55E',
-    route: '/(tabs)/academics',
-  },
-  {
     id: 'coding',
     title: 'CODING',
     subtitle: 'DAILY CHALLENGE',
@@ -96,7 +87,25 @@ const SERVICE_CARDS = [
     badgeBg: '#0891B2',
     route: '/campus-map',
   },
+  {
+    id: 'print',
+    title: 'PRINT SHOP',
+    subtitle: 'SEND PDF TO STATIONERY',
+    badge: 'Quick prints',
+    emoji: '🖨️',
+    colors: ['#F5E8FF', '#FFF5FE'],
+    badgeBg: '#8B5CF6',
+    route: '/print',
+  },
 ];
+
+const PRINT_MICRO = {
+  title: 'Print & Pick',
+  tagline: 'Upload your PDF',
+  sub: 'Select a 10-minute window and scan to collect.',
+  stats: ['Instant intake', 'QR verification', 'Stationery ready'],
+  route: '/print',
+};
 
 function greeting() {
   const h = new Date().getHours();
@@ -105,23 +114,27 @@ function greeting() {
   return 'Good evening';
 }
 
-const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+const AnimatedLayout = Animated.createAnimatedComponent(View);
+const AnimatedContent = Animated.createAnimatedComponent(View);
 
 function SpringCard({ children, style, onPress, delay = 0, ...props }: any) {
   const scale = useSharedValue(1);
   const animatedStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
 
   return (
-    <AnimatedPressable
-      onPressIn={() => { scale.value = withSpring(0.96, { damping: 15, stiffness: 200 }); }}
-      onPressOut={() => { scale.value = withSpring(1, { damping: 15, stiffness: 200 }); }}
-      onPress={onPress}
-      style={[style, animatedStyle]}
-      entering={FadeInDown.delay(delay).springify()}
-      {...props}
-    >
-      {children}
-    </AnimatedPressable>
+    <AnimatedLayout layout={Layout.springify()} entering={FadeInDown.delay(delay).springify()} style={style}>
+      <Pressable
+        onPressIn={() => { scale.value = withSpring(0.96, { damping: 15, stiffness: 200 }); }}
+        onPressOut={() => { scale.value = withSpring(1, { damping: 15, stiffness: 200 }); }}
+        onPress={onPress}
+        style={{ flex: 1 }}
+        {...props}
+      >
+        <AnimatedContent style={[{ flex: 1 }, animatedStyle]}>
+          {children}
+        </AnimatedContent>
+      </Pressable>
+    </AnimatedLayout>
   );
 }
 
@@ -170,9 +183,9 @@ export default function HomeScreen() {
             </View>
             <Text style={styles.greeting}>{greeting()}, Yugan 👋</Text>
           </View>
-          <View style={styles.avatarBtn}>
+          <TouchableOpacity style={styles.avatarBtn} onPress={() => router.push('/profile')}>
             <Ionicons name="person" size={22} color={Colors.textSecondary} />
-          </View>
+          </TouchableOpacity>
         </View>
       </Animated.View>
 
@@ -276,6 +289,36 @@ export default function HomeScreen() {
             </View>
           </>
         )}
+
+        <View style={styles.printHighlightSection}>
+          <Text style={styles.sectionTitle}>Need a quick print?</Text>
+          <SpringCard
+            delay={filteredCards.length * 50}
+            onPress={() => router.push(PRINT_MICRO.route as any)}
+            style={styles.printHighlightCard}
+          >
+            <LinearGradient
+              colors={['#FFE8CC', '#FFF3E8']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.printHighlightGradient}
+            >
+              <View style={styles.printContent}>
+                <View>
+                  <Text style={styles.printTitle}>{PRINT_MICRO.title}</Text>
+                  <Text style={styles.printTagline}>{PRINT_MICRO.tagline}</Text>
+                  <Text style={styles.printSub}>{PRINT_MICRO.sub}</Text>
+                </View>
+                <View style={styles.printStatsRow}>
+                  {PRINT_MICRO.stats.map((stat) => (
+                    <Text key={stat} style={styles.printStat}>{stat}</Text>
+                  ))}
+                </View>
+              </View>
+              <Text style={styles.printCue}>🖨️</Text>
+            </LinearGradient>
+          </SpringCard>
+        </View>
 
         {/* ═══ UPCOMING EVENTS (horizontal strip) ═══ */}
         {filteredEvents.length > 0 && (
@@ -528,6 +571,59 @@ const styles = StyleSheet.create({
     height: CARD_SIZE,
     borderRadius: Radius.xl,
     overflow: 'hidden',
+  },
+  card: {
+    flex: 1,
+    padding: Spacing.md,
+    justifyContent: 'space-between',
+  },
+  printHighlightSection: {
+    paddingHorizontal: Spacing.section,
+    marginTop: Spacing.md,
+    gap: Spacing.sm,
+  },
+  printHighlightCard: {
+    borderRadius: Radius.xxl,
+    overflow: 'hidden',
+  },
+  printHighlightGradient: {
+    padding: Spacing.lg,
+    borderRadius: Radius.xxl,
+  },
+  printContent: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: Spacing.xl,
+  },
+  printTitle: {
+    ...Typography.h4,
+    fontWeight: '700',
+  },
+  printTagline: {
+    ...Typography.body2,
+    color: Colors.textSecondary,
+    marginTop: Spacing.xs,
+  },
+  printSub: {
+    ...Typography.caption,
+    color: Colors.textSecondary,
+    marginTop: Spacing.xs,
+  },
+  printStatsRow: {
+    flexDirection: 'column',
+    gap: 2,
+    marginTop: Spacing.md,
+  },
+  printStat: {
+    ...Typography.caption,
+    color: Colors.primaryDark,
+    fontWeight: '600',
+  },
+  printCue: {
+    ...Typography.display,
+    fontSize: 40,
+    opacity: 0.4,
   },
   card: {
     flex: 1,

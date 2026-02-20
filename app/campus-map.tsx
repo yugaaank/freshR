@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import React, { useState } from 'react';
 import {
@@ -10,7 +11,7 @@ import {
 } from 'react-native';
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withRepeat, withTiming } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
+import Svg, { Defs, LinearGradient as SvgLinearGradient, Rect, Stop } from 'react-native-svg';
 import TagPill from '../src/components/ui/TagPill';
 import { Colors, Radius, Shadows, Spacing, Typography } from '../src/theme';
 
@@ -24,8 +25,6 @@ const LANDMARKS = [
     { id: 'l7', name: 'ATM & Bank', category: 'Finance', floor: 'Admin Block', distance: '250m', icon: '🏦', color: Colors.tagGreen, available: true, opens: '24/7' },
     { id: 'l8', name: 'Girls Hostel A', category: 'Hostel', floor: 'Block A', distance: '700m', icon: '🏠', color: Colors.tagBlue, available: true, opens: 'Check-in 24/7' },
 ];
-
-const CATEGORY_FILTERS = ['All', 'Academic', 'Food', 'Sports', 'Tech', 'Health', 'Events'];
 
 function AnimatedGradientBorder() {
     const rotation = useSharedValue(0);
@@ -46,11 +45,11 @@ function AnimatedGradientBorder() {
             <Animated.View style={[{ position: 'absolute', width: '200%', height: '200%', left: '-50%', top: '-50%' }, animatedStyle]}>
                 <Svg width="100%" height="100%">
                     <Defs>
-                        <LinearGradient id="grad" x1="0" y1="0" x2="1" y2="1">
+                        <SvgLinearGradient id="grad" x1="0" y1="0" x2="1" y2="1">
                             <Stop offset="0" stopColor={Colors.primary} stopOpacity="1" />
                             <Stop offset="0.5" stopColor={Colors.primary} stopOpacity="0" />
                             <Stop offset="1" stopColor={Colors.primary} stopOpacity="1" />
-                        </LinearGradient>
+                        </SvgLinearGradient>
                     </Defs>
                     <Rect width="100%" height="100%" fill="url(#grad)" />
                 </Svg>
@@ -142,12 +141,11 @@ const mapStyles = StyleSheet.create({
 });
 
 export default function CampusMapScreen() {
-    const [activeCategory, setActiveCategory] = useState('All');
     const [activeLandmark, setActiveLandmark] = useState<string | null>(null);
 
-    const filtered = LANDMARKS.filter(
-        (l) => activeCategory === 'All' || l.category === activeCategory
-    );
+    const filtered = LANDMARKS;
+
+    const currentLandmark = activeLandmark ? LANDMARKS.find((l) => l.id === activeLandmark) : null;
 
     return (
         <SafeAreaView style={styles.safe} edges={['top']}>
@@ -163,30 +161,27 @@ export default function CampusMapScreen() {
 
             {/* Map Takes Upper Half */}
             <View style={styles.mapContainer}>
+                <LinearGradient
+                    colors={['#1F1B3A', '#2B2D63', 'rgba(43,45,99,0.86)', 'rgba(43,45,99,0.2)']}
+                    style={styles.mapGradient}
+                />
                 <MockMapView activeLandmark={activeLandmark} />
+            </View>
+            <View style={styles.mapInfoWrapper}>
+                <View style={styles.mapInfoCard}>
+                    <View>
+                        <Text style={styles.mapInfoLabel}>You are here</Text>
+                        <Text style={styles.mapInfoTitle}>{currentLandmark ? currentLandmark.name : 'Campus Core'}</Text>
+                    </View>
+                    <View style={styles.mapInfoStats}>
+                        <Text style={styles.mapInfoStat}>{currentLandmark ? currentLandmark.distance : 'Approx 0m'} away</Text>
+                        <Text style={styles.mapInfoStat}>{currentLandmark ? currentLandmark.opens : 'All wings open'}</Text>
+                    </View>
+                </View>
             </View>
 
             {/* Bottom Sheet */}
             <View style={[styles.bottomSheet, Shadows.floating]}>
-                {/* Category Filter */}
-                <FlatList
-                    horizontal
-                    data={CATEGORY_FILTERS}
-                    keyExtractor={(c) => c}
-                    showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={styles.filterRow}
-                    renderItem={({ item: cat }) => (
-                        <TouchableOpacity
-                            style={[styles.filterChip, activeCategory === cat && styles.filterChipActive]}
-                            onPress={() => setActiveCategory(cat)}
-                        >
-                            <Text style={[styles.filterText, activeCategory === cat && styles.filterTextActive]}>
-                                {cat}
-                            </Text>
-                        </TouchableOpacity>
-                    )}
-                />
-
                 {/* Landmark List */}
                 <FlatList
                     data={filtered}
@@ -246,25 +241,25 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
     },
-    mapContainer: { height: 260 },
+    mapContainer: {
+        height: 280,
+        marginHorizontal: Spacing.lg,
+        borderRadius: Radius.xl,
+        overflow: 'hidden',
+        marginTop: 4,
+        backgroundColor: '#0f0e25',
+    },
+    mapGradient: {
+        ...StyleSheet.absoluteFillObject,
+    },
     bottomSheet: {
         flex: 1,
         backgroundColor: Colors.cardBg,
         borderTopLeftRadius: Radius.xl,
         borderTopRightRadius: Radius.xl,
         paddingTop: Spacing.md,
-        marginTop: -Radius.xl,
+        marginTop: Spacing.sm,
     },
-    filterRow: { paddingHorizontal: Spacing.lg, gap: Spacing.sm, paddingBottom: Spacing.sm },
-    filterChip: {
-        paddingHorizontal: Spacing.md,
-        paddingVertical: Spacing.xs + 2,
-        borderRadius: Radius.pill,
-        backgroundColor: Colors.sectionBg,
-    },
-    filterChipActive: { backgroundColor: Colors.primaryLight },
-    filterText: { ...Typography.caption, color: Colors.textSecondary, fontWeight: '600' },
-    filterTextActive: { color: Colors.primary },
     landmarkList: { paddingHorizontal: Spacing.lg, paddingBottom: Spacing.xxl, gap: Spacing.sm },
     landmarkCard: {
         flexDirection: 'row',
@@ -287,4 +282,34 @@ const styles = StyleSheet.create({
     landmarkMeta: { ...Typography.caption, color: Colors.textSecondary },
     landmarkStatus: { ...Typography.caption, fontWeight: '600' },
     landmarkRight: { alignItems: 'flex-end', marginLeft: Spacing.sm },
+    mapInfoWrapper: {
+        marginHorizontal: Spacing.lg,
+        marginTop: Spacing.md,
+    },
+    mapInfoCard: {
+        backgroundColor: 'rgba(255,255,255,0.95)',
+        borderRadius: Radius.xl,
+        padding: Spacing.md,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        ...Shadows.md,
+    },
+    mapInfoLabel: {
+        ...Typography.caption,
+        color: Colors.textSecondary,
+        textTransform: 'uppercase' as const,
+        letterSpacing: 0.5,
+    },
+    mapInfoTitle: {
+        ...Typography.h4,
+        fontWeight: '700',
+    },
+    mapInfoStats: {
+        alignItems: 'flex-end',
+    },
+    mapInfoStat: {
+        ...Typography.caption,
+        color: Colors.textSecondary,
+    },
 });

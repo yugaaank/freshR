@@ -1,9 +1,7 @@
-import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useMemo, useState } from 'react';
 import {
-    FlatList,
     Image,
     ScrollView,
     StatusBar,
@@ -12,35 +10,39 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
-import Animated, { FadeInDown, useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
+import Animated, { FadeInDown, Layout, useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import Card from '../../src/components/ui/Card';
 import SectionHeader from '../../src/components/ui/SectionHeader';
 import TagPill from '../../src/components/ui/TagPill';
 import { useHybridStore } from '../../src/store/hybridStore';
-import { Colors, Radius, Shadows, Spacing, Typography } from '../../src/theme';
+import { Colors, Radius, Spacing, Typography } from '../../src/theme';
 
 const AnimatedPressable = Animated.createAnimatedComponent(TouchableOpacity);
+const AnimatedLayout = Animated.createAnimatedComponent(View);
+const AnimatedContent = Animated.createAnimatedComponent(View);
 
 function SpringCard({ children, style, onPress, delay = 0, entering, ...props }: any) {
     const scale = useSharedValue(1);
     const animatedStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
     return (
-        <AnimatedPressable
-            activeOpacity={0.9}
-            onPressIn={() => {
-                scale.value = withSpring(0.96, { damping: 15, stiffness: 200 });
-            }}
-            onPressOut={() => {
-                scale.value = withSpring(1, { damping: 15, stiffness: 200 });
-            }}
-            onPress={onPress}
-            style={[style, animatedStyle]}
-            entering={entering ? entering.delay(delay).springify() : FadeInDown.delay(delay).springify()}
-            {...props}
-        >
-            {children}
-        </AnimatedPressable>
+        <AnimatedLayout layout={Layout.springify()} entering={entering ? entering.delay(delay).springify() : FadeInDown.delay(delay).springify()} style={style}>
+            <AnimatedPressable
+                activeOpacity={0.9}
+                onPressIn={() => {
+                    scale.value = withSpring(0.96, { damping: 15, stiffness: 200 });
+                }}
+                onPressOut={() => {
+                    scale.value = withSpring(1, { damping: 15, stiffness: 200 });
+                }}
+                onPress={onPress}
+                style={{ flex: 1 }}
+                {...props}
+            >
+                <AnimatedContent style={[{ flex: 1 }, animatedStyle]}>
+                    {children}
+                </AnimatedContent>
+            </AnimatedPressable>
+        </AnimatedLayout>
     );
 }
 

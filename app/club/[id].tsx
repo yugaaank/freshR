@@ -12,28 +12,33 @@ import {
     TouchableOpacity,
     View
 } from 'react-native';
-import Animated, { FadeInUp, SlideInRight } from 'react-native-reanimated';
+import Animated, { FadeInUp } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useHybridStore } from '../../src/store/hybridStore';
-import { Colors, Radius, Shadows, Spacing, Typography } from '../../src/theme';
-
-const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
+import { Colors, Radius, Spacing, Typography } from '../../src/theme';
 
 export default function ClubProfileScreen() {
     const { id } = useLocalSearchParams<{ id: string }>();
     const { getClubDetails, user, followClub } = useHybridStore();
+    const { club, events, posts } = useMemo(() => getClubDetails(id), [id, getClubDetails]);
 
-    const { club, events } = useMemo(() => getClubDetails(id), [id, getClubDetails]);
-    const isFollowing = user.followedClubs.includes(id);
+    const stats = useMemo(
+        () => [
+            { label: 'Posts', value: posts.length },
+            { label: 'Followers', value: club?.followersCount ?? 0 },
+            { label: 'Events', value: events.length },
+        ],
+        [posts.length, club?.followersCount, events.length]
+    );
 
     if (!club) return null;
 
-    // Sort events by date natively (dummy sort for tracklist feel)
-    const sortedEvents = [...events].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    const isFollowing = user.followedClubs.includes(club.id);
+    const clubTypeLabel = club.vibeTag === 'Tech' ? 'Department' : 'Club';
+    const accountTone = `${clubTypeLabel} • ${club.vibeTag} Focus`;
+    const heroStory = posts[0];
 
-    // Fallback to determine type visually
-    const isTech = club.vibeTag.toLowerCase().includes('tech');
-    const clubType = isTech ? 'Department' : 'Club';
+    const gridPosts = posts.slice(0, 6);
 
     return (
         <View style={styles.flex}>
@@ -47,308 +52,374 @@ export default function ClubProfileScreen() {
             </SafeAreaView>
 
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
-                <Animated.View style={styles.albumHeaderContainer} entering={FadeInUp.springify()}>
-                    {/* Full Bleed Banner */}
-                    <ImageBackground source={{ uri: club.banner }} style={styles.headerBanner}>
+                <Animated.View style={styles.heroShell} entering={FadeInUp.springify()}>
+                    <ImageBackground
+                        source={{ uri: club.banner }}
+                        style={styles.heroImage}
+                        imageStyle={styles.heroImageStyle}
+                    >
                         <LinearGradient
-                            colors={['transparent', 'rgba(0,0,0,0.85)', Colors.background]}
-                            locations={[0, 0.6, 1]}
-                            style={styles.headerGradient}
+                            colors={['rgba(0,0,0,0.9)', 'rgba(0,0,0,0.3)', 'rgba(250,250,250,0.0)']}
+                            locations={[0, 0.45, 1]}
+                            style={styles.heroGradient}
                         />
+                        <View style={styles.heroTopBanners}>
+                            <View style={styles.heroBadge}>
+                                <Text style={styles.heroBadgeText}>Instagram</Text>
+                            </View>
+                            <View style={styles.heroBadgeSecondary}>
+                                <Text style={styles.heroBadgeTextSecondary}>{clubTypeLabel}</Text>
+                            </View>
+                        </View>
+                        <View style={styles.heroTextBlock}>
+                            <Text style={styles.heroName}>{club.name}</Text>
+                            <Text style={styles.heroMeta}>{accountTone}</Text>
+                        </View>
                     </ImageBackground>
 
-                    {/* Content overlapping banner */}
-                    <View style={styles.albumInfoWrap}>
-                        <View style={styles.logoTitleRow}>
-                            <Image source={{ uri: club.logo }} style={styles.floatingLogo} />
-                            <View style={styles.albumInfoText}>
-                                <Text style={styles.albumTitle} numberOfLines={2}>{club.name}</Text>
-                                <Text style={styles.albumMeta}>{clubType} • {club.followersCount} Followers</Text>
+                    <View style={styles.profileCard}>
+                        <View style={styles.profileTopRow}>
+                            <View style={styles.avatarRing}>
+                                <Image source={{ uri: club.logo }} style={styles.avatar} />
+                            </View>
+                            <View style={styles.profileMeta}>
+                                <Text style={styles.profileName}>{club.name}</Text>
+                                <Text style={styles.profileTagline} numberOfLines={2}>
+                                    {club.tagline}
+                                </Text>
+                                <Text style={styles.profileTone}>{accountTone}</Text>
                             </View>
                         </View>
 
-                        <View style={styles.actionRow}>
+                        <View style={styles.statRow}>
+                            {stats.map((item) => (
+                                <View key={item.label} style={styles.statCell}>
+                                    <Text style={styles.statValue}>{item.value}</Text>
+                                    <Text style={styles.statLabel}>{item.label}</Text>
+                                </View>
+                            ))}
+                        </View>
+
+                        <View style={styles.buttonRow}>
                             <TouchableOpacity
-                                style={[styles.followBtn, isFollowing && styles.followBtnActive]}
+                                style={[styles.followBtn, isFollowing && styles.followingBtn]}
                                 onPress={() => followClub(club.id)}
                                 activeOpacity={0.8}
                             >
-                                <Text style={[styles.followBtnText, isFollowing && styles.followBtnTextActive]}>
+                                <Text style={[styles.followBtnText, isFollowing && styles.followingBtnText]}>
                                     {isFollowing ? 'Following' : 'Follow'}
                                 </Text>
                             </TouchableOpacity>
+                            <TouchableOpacity style={styles.outlineBtn} activeOpacity={0.8}>
+                                <Text style={styles.outlineBtnText}>Message</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity style={styles.iconBtn} activeOpacity={0.8}>
+                                <Ionicons name="share-social" size={18} color={Colors.textSecondary} />
+                            </TouchableOpacity>
                         </View>
-                    </View>
-                </Animated.View>
 
-                {/* Section Header for Events */}
-                <View style={styles.eventsHeader}>
-                    <Text style={styles.eventsSectionTitle}>Upcoming Events</Text>
-                </View>
+                        <TouchableOpacity style={styles.bioCard} activeOpacity={0.8}>
+                            <Text style={styles.bioLabel}>Bio</Text>
+                            <Text style={styles.bioText}>{club.tagline} • {club.vibeTag} Stories & Events.</Text>
+                        </TouchableOpacity>
 
-                <View style={styles.tracklist}>
-                    {sortedEvents.map((ev, index) => {
-                        const isRegistered = user.registeredEvents.includes(ev.id);
+                        <View style={styles.gridHeader}>
+                            <Text style={styles.gridTitle}>Recent Posts</Text>
+                            <Text style={styles.gridAction}>View all</Text>
+                        </View>
 
-                        return (
-                            <AnimatedTouchable
-                                key={ev.id}
-                                entering={SlideInRight.delay(index * 50).springify()}
-                                style={styles.premiumEventCard}
-                                onPress={() => router.push(`/event/${ev.id}` as any)}
-                                activeOpacity={0.7}
-                            >
-                                {ev.mediaAssets && ev.mediaAssets.length > 0 && (
-                                    <View style={styles.eventImageBannerWrap}>
-                                        <Image source={{ uri: ev.mediaAssets[0] }} style={styles.eventImageBanner} />
-                                        <View style={styles.eventDateBadgeOverlay}>
-                                            <Text style={styles.eventDateMonthOverlay}>
-                                                {new Date(ev.date).toLocaleString('default', { month: 'short' }).toUpperCase()}
-                                            </Text>
-                                            <Text style={styles.eventDateDayOverlay}>
-                                                {new Date(ev.date).getDate()}
-                                            </Text>
-                                        </View>
-                                    </View>
-                                )}
+                        <View style={styles.gridList}>
+                            {gridPosts.map((post) => (
+                                <TouchableOpacity key={post.id} style={styles.gridItem} activeOpacity={0.8}>
+                                    <Image source={{ uri: post.mediaUrl }} style={styles.gridImage} />
+                                </TouchableOpacity>
+                            ))}
+                        </View>
 
-                                <View style={styles.eventRowContent}>
-                                    {(!ev.mediaAssets || ev.mediaAssets.length === 0) && (
-                                        <View style={styles.eventDateBadgeTextOnly}>
-                                            <Text style={styles.eventDateMonthTextOnly}>
-                                                {new Date(ev.date).toLocaleString('default', { month: 'short' }).toUpperCase()}
-                                            </Text>
-                                            <Text style={styles.eventDateDayTextOnly}>
-                                                {new Date(ev.date).getDate()}
-                                            </Text>
-                                        </View>
-                                    )}
-                                    <View style={styles.eventTextWrap}>
-                                        <Text style={[styles.eventTitle, isRegistered && { color: Colors.primary }]} numberOfLines={2}>
-                                            {ev.title}
+                        {heroStory && (
+                            <View style={styles.featuredRow}>
+                                <Text style={styles.featuredLabel}>Featured Reel</Text>
+                                <View style={styles.featuredCard}>
+                                    <Image source={{ uri: heroStory.mediaUrl }} style={styles.featuredImage} />
+                                    <View style={styles.featuredOverlay}>
+                                        <Text style={styles.featuredCaption} numberOfLines={2}>
+                                            {heroStory.caption}
                                         </Text>
-
-                                        <View style={styles.eventMetaRow}>
-                                            {isRegistered ? (
-                                                <View style={styles.registeredBadge}>
-                                                    <Text style={styles.registeredText}>REGISTERED</Text>
-                                                </View>
-                                            ) : null}
-                                            <Text style={styles.eventSubtitle} numberOfLines={1}>
-                                                {ev.time} • {ev.location}
-                                            </Text>
-                                        </View>
                                     </View>
                                 </View>
-                            </AnimatedTouchable>
-                        );
-                    })}
-                </View>
-
-                {/* Footer Padding */}
-                <View style={{ height: 120 }} />
+                            </View>
+                        )}
+                    </View>
+                </Animated.View>
             </ScrollView>
         </View>
     );
 }
 
 const styles = StyleSheet.create({
-    flex: { flex: 1, backgroundColor: Colors.background },
+    flex: { flex: 1, backgroundColor: '#FBFBFD' },
     safe: { backgroundColor: Colors.background },
     topNav: {
-        height: 50,
+        height: 60,
         justifyContent: 'center',
         paddingHorizontal: Spacing.section,
     },
-    navBtn: { width: 40, height: 40, justifyContent: 'center' },
-    scroll: { paddingBottom: 40 },
-
-    // Album Header Redesign
-    albumHeaderContainer: {
-        position: 'relative',
-        width: '100%',
+    navBtn: {
+        width: 40,
+        height: 40,
+        borderRadius: 12,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: '#FFF',
+        shadowColor: '#000',
+        shadowOpacity: 0.08,
+        shadowOffset: { width: 0, height: 3 },
+        shadowRadius: 8,
+        elevation: 3,
     },
-    headerBanner: {
-        width: '100%',
-        height: 250,
-        backgroundColor: Colors.surface,
+    scroll: {
+        paddingBottom: 40,
     },
-    headerGradient: {
+    heroShell: {
+        paddingBottom: Spacing.lg,
+    },
+    heroImage: {
+        width: '100%',
+        height: 220,
+        justifyContent: 'space-between',
+    },
+    heroImageStyle: {
+        opacity: 0.9,
+    },
+    heroGradient: {
         ...StyleSheet.absoluteFillObject,
     },
-    albumInfoWrap: {
-        paddingHorizontal: Spacing.section,
-        marginTop: -60, // Overlap the banner slightly
-    },
-    logoTitleRow: {
+    heroTopBanners: {
         flexDirection: 'row',
-        alignItems: 'flex-end',
-        marginBottom: Spacing.lg,
+        justifyContent: 'space-between',
+        paddingHorizontal: Spacing.section,
+        paddingTop: Spacing.md,
     },
-    floatingLogo: {
-        width: 80,
-        height: 80,
-        borderRadius: 40,
-        backgroundColor: Colors.surface,
-        borderWidth: 3,
-        borderColor: Colors.background,
-        ...Shadows.md,
-        marginRight: Spacing.md,
+    heroBadge: {
+        paddingHorizontal: 12,
+        paddingVertical: 4,
+        borderRadius: Radius.xxl,
+        backgroundColor: 'rgba(255,255,255,0.2)',
     },
-    albumInfoText: {
-        flex: 1,
-        paddingBottom: 4, // Align text neatly next to the circular logo
+    heroBadgeText: {
+        ...Typography.mono,
+        color: '#FFF',
+        fontWeight: '600',
     },
-    albumTitle: {
+    heroBadgeSecondary: {
+        paddingHorizontal: 12,
+        paddingVertical: 4,
+        borderRadius: Radius.xxl,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.3)',
+    },
+    heroBadgeTextSecondary: {
+        ...Typography.caption,
+        color: '#FFF',
+    },
+    heroTextBlock: {
+        paddingHorizontal: Spacing.section,
+        paddingBottom: Spacing.md,
+    },
+    heroName: {
         ...Typography.h2,
         color: '#FFF',
-        marginBottom: 4,
     },
-    albumMeta: {
-        ...Typography.caption,
-        color: 'rgba(255,255,255,0.7)',
+    heroMeta: {
+        ...Typography.body2,
+        color: 'rgba(255,255,255,0.85)',
     },
-
-    // Action Row
-    actionRow: {
+    profileCard: {
+        backgroundColor: '#FFFFFF',
+        marginHorizontal: Spacing.section,
+        marginTop: -40,
+        borderRadius: Radius.xxl,
+        padding: Spacing.section,
+        shadowColor: '#000',
+        shadowOpacity: 0.05,
+        shadowOffset: { width: 0, height: 8 },
+        shadowRadius: 20,
+        elevation: 6,
+    },
+    profileTopRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'flex-start',
-        marginBottom: Spacing.sm,
+        marginBottom: Spacing.md,
+    },
+    avatarRing: {
+        width: 90,
+        height: 90,
+        borderRadius: 45,
+        borderWidth: 3,
+        borderColor: '#FFE7CB',
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: '#FFF',
+        marginRight: Spacing.lg,
+    },
+    avatar: {
+        width: 74,
+        height: 74,
+        borderRadius: 37,
+    },
+    profileMeta: {
+        flex: 1,
+    },
+    profileName: {
+        ...Typography.h3,
+        fontWeight: '700',
+        marginBottom: 2,
+    },
+    profileTagline: {
+        ...Typography.body2,
+        color: Colors.textSecondary,
+    },
+    profileTone: {
+        ...Typography.caption,
+        marginTop: Spacing.xs,
+        color: Colors.textSecondary,
+        letterSpacing: 0.5,
+    },
+    statRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginBottom: Spacing.md,
+    },
+    statCell: {
+        alignItems: 'center',
+        flex: 1,
+    },
+    statValue: {
+        ...Typography.h4,
+        fontWeight: '700',
+    },
+    statLabel: {
+        ...Typography.caption,
+        color: Colors.textSecondary,
+    },
+    buttonRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: Spacing.md,
     },
     followBtn: {
-        backgroundColor: 'rgba(255,255,255,0.1)',
-        borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.2)',
-        borderRadius: Radius.pill,
-        paddingHorizontal: 24,
-        paddingVertical: 10,
-    },
-    followBtnActive: {
-        borderColor: Colors.primary,
+        flex: 1,
         backgroundColor: Colors.primary,
+        paddingVertical: Spacing.md,
+        borderRadius: Radius.lg,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: Spacing.sm,
+    },
+    followingBtn: {
+        backgroundColor: '#1E1E1F',
     },
     followBtnText: {
         ...Typography.label,
         color: '#FFF',
-        fontWeight: 'bold',
     },
-    followBtnTextActive: {
+    followingBtnText: {
         color: '#FFF',
     },
-
-    eventsHeader: {
-        paddingHorizontal: Spacing.section,
-        marginTop: Spacing.xl,
+    outlineBtn: {
+        flex: 1,
+        borderWidth: 1,
+        borderColor: Colors.borderStrong,
+        borderRadius: Radius.lg,
+        paddingVertical: Spacing.md,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginHorizontal: Spacing.xs,
+    },
+    outlineBtnText: {
+        ...Typography.label,
+        color: Colors.textSecondary,
+    },
+    iconBtn: {
+        width: 48,
+        height: 48,
+        borderRadius: Radius.xl,
+        borderWidth: 1,
+        borderColor: Colors.borderStrong,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    bioCard: {
+        backgroundColor: Colors.surface,
+        borderRadius: Radius.md,
+        padding: Spacing.md,
         marginBottom: Spacing.md,
     },
-    eventsSectionTitle: {
-        ...Typography.h3,
-        color: Colors.text,
-    },
-
-    // Tracklist (Premium Event Cards)
-    tracklist: {
-        paddingHorizontal: Spacing.section,
-    },
-    premiumEventCard: {
-        marginBottom: Spacing.lg,
-        backgroundColor: Colors.surface,
-        borderRadius: Radius.lg,
-        borderWidth: 1,
-        borderColor: Colors.border,
-        overflow: 'hidden',
-    },
-    eventImageBannerWrap: {
-        width: '100%',
-        height: 140,
-        position: 'relative',
-    },
-    eventImageBanner: {
-        width: '100%',
-        height: '100%',
-        backgroundColor: Colors.borderStrong,
-    },
-    eventDateBadgeOverlay: {
-        position: 'absolute',
-        bottom: 12,
-        left: 12,
-        width: 46,
-        height: 52,
-        backgroundColor: '#FFF',
-        borderRadius: Radius.md,
-        alignItems: 'center',
-        justifyContent: 'center',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.2,
-        shadowRadius: 6,
-        elevation: 5,
-    },
-    eventDateMonthOverlay: {
-        ...Typography.micro,
-        color: Colors.primary,
-        fontWeight: 'bold',
-        marginBottom: 2,
-    },
-    eventDateDayOverlay: {
-        ...Typography.h4,
-        color: '#000',
-        lineHeight: 20,
-    },
-    eventRowContent: {
-        flexDirection: 'row',
-        padding: Spacing.md,
-        alignItems: 'center',
-    },
-    eventTextWrap: {
-        flex: 1,
-    },
-    eventDateBadgeTextOnly: {
-        width: 50,
-        height: 56,
-        backgroundColor: 'rgba(255,107,53,0.1)',
-        borderRadius: Radius.md,
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginRight: Spacing.md,
-        borderWidth: 1,
-        borderColor: 'rgba(255,107,53,0.2)',
-    },
-    eventDateMonthTextOnly: {
-        ...Typography.micro,
-        color: Colors.primary,
-        fontWeight: 'bold',
-        marginBottom: 2,
-    },
-    eventDateDayTextOnly: {
-        ...Typography.h4,
-        color: Colors.primary,
-        lineHeight: 20,
-    },
-    eventTitle: {
-        ...Typography.h5,
-        color: Colors.text,
-        marginBottom: 4,
-    },
-    eventMetaRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    registeredBadge: {
-        backgroundColor: Colors.primary,
-        paddingHorizontal: 6,
-        paddingVertical: 2,
-        borderRadius: 4,
-        marginRight: 6,
-    },
-    registeredText: {
-        fontSize: 9,
-        color: '#FFF',
-        fontWeight: 'bold',
-    },
-    eventSubtitle: {
+    bioLabel: {
         ...Typography.caption,
         color: Colors.textSecondary,
+        marginBottom: Spacing.xs,
+    },
+    bioText: {
+        ...Typography.body2,
+        color: Colors.text,
+    },
+    gridHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: Spacing.sm,
+    },
+    gridTitle: {
+        ...Typography.h4,
+    },
+    gridAction: {
+        ...Typography.caption,
+        color: Colors.primary,
+    },
+    gridList: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        justifyContent: 'space-between',
+    },
+    gridItem: {
+        width: '32%',
+        height: 100,
+        marginBottom: Spacing.sm,
+        borderRadius: Radius.md,
+        overflow: 'hidden',
+    },
+    gridImage: {
+        width: '100%',
+        height: '100%',
+    },
+    featuredRow: {
+        marginTop: Spacing.md,
+    },
+    featuredLabel: {
+        ...Typography.caption,
+        color: Colors.textSecondary,
+        marginBottom: Spacing.xs,
+    },
+    featuredCard: {
+        borderRadius: Radius.xxl,
+        overflow: 'hidden',
+        height: 180,
+    },
+    featuredImage: {
+        width: '100%',
+        height: '100%',
+    },
+    featuredOverlay: {
+        ...StyleSheet.absoluteFillObject,
+        justifyContent: 'flex-end',
+        padding: Spacing.md,
+        backgroundColor: 'rgba(0,0,0,0.25)',
+    },
+    featuredCaption: {
+        ...Typography.body1,
+        color: '#FFF',
+        fontWeight: '600',
     },
 });

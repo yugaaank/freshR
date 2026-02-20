@@ -92,14 +92,6 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
-        name="academics"
-        options={{
-          tabBarIcon: ({ focused }) => (
-            <TabIcon name={focused ? 'school' : 'school-outline'} label="Grades" focused={focused} />
-          ),
-        }}
-      />
-      <Tabs.Screen
         name="calendar"
         options={{
           tabBarIcon: ({ focused }) => (
@@ -120,7 +112,6 @@ const styles = StyleSheet.create({
     paddingTop: Spacing.sm,
     paddingBottom: Platform.OS === 'ios' ? Spacing.xl : Spacing.sm,
     elevation: 8,
-    // Remove default shadow, use elevation only
     shadowOpacity: 0,
   },
   iconWrap: { alignItems: 'center', gap: 2, width: 58, position: 'relative' },

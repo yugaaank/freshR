@@ -13,10 +13,9 @@ import {
     TouchableOpacity,
     View
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHybridStore } from '../../src/store/hybridStore';
-import { Colors, Radius, Shadows, Spacing, Typography } from '../../src/theme';
+import { Radius, Spacing, Typography } from '../../src/theme';
 
 const { width: SW, height: SH } = Dimensions.get('window');
 

@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
     Dimensions,
     Image,
@@ -13,7 +13,16 @@ import {
     TouchableOpacity,
     View
 } from 'react-native';
-import Animated, { Extrapolation, FadeInDown, interpolate, useAnimatedScrollHandler, useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
+import Animated, {
+    Extrapolation,
+    FadeInDown,
+    Layout,
+    interpolate,
+    useAnimatedScrollHandler,
+    useAnimatedStyle,
+    useSharedValue,
+    withSpring
+} from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { menuCategories, menuItems, restaurants } from '../../src/data/food';
 import { useCartStore } from '../../src/store/cartStore';
@@ -42,6 +51,10 @@ function SpringCard({ children, style, onPress, delay = 0, ...props }: any) {
     );
 }
 
+function createQRCode(prefix: string) {
+    return `${prefix}-${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
+}
+
 export default function FoodScreen() {
     const [activeRestaurantId, setActiveRestaurantId] = useState(restaurants[0].id);
     const [activeCategory, setActiveCategory] = useState('All');
@@ -49,6 +62,25 @@ export default function FoodScreen() {
     const [nonVegOnly, setNonVegOnly] = useState(false);
     const [search, setSearch] = useState('');
     const cart = useCartStore();
+    const [cartOpen, setCartOpen] = useState(false);
+    const [checkoutStep, setCheckoutStep] = useState<'review' | 'payment'>('review');
+    const [orderStatus, setOrderStatus] = useState<string | null>(null);
+    const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
+    const [lastSlot, setLastSlot] = useState<string | null>(null);
+    const [slotOpen, setSlotOpen] = useState(false);
+    const [qrPending, setQrPending] = useState(false);
+    const [qrScanned, setQrScanned] = useState(false);
+    const [qrCode, setQrCode] = useState<string>('');
+    const slots = useMemo(() => {
+        const generated: string[] = [];
+        for (let hour = 8; hour < 18; hour++) {
+            for (let minute = 0; minute < 60; minute += 10) {
+                const label = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+                generated.push(label);
+            }
+        }
+        return generated;
+    }, []);
 
     const restaurant = restaurants.find((r) => r.id === activeRestaurantId) ?? restaurants[0];
 
@@ -331,7 +363,7 @@ export default function FoodScreen() {
             {/* ═══ CART BAR ═══ */}
             {cartCount > 0 && (
                 <View style={styles.cartBarWrap}>
-                    <TouchableOpacity activeOpacity={0.92}>
+                    <TouchableOpacity activeOpacity={0.92} onPress={() => { setCartOpen(true); setCheckoutStep('review'); }}>
                         <BlurView intensity={80} tint="dark" style={styles.cartBar}>
                             <View style={styles.cartLeft}>
                                 <View style={styles.cartBadge}>
@@ -343,6 +375,132 @@ export default function FoodScreen() {
                         </BlurView>
                     </TouchableOpacity>
                 </View>
+            )}
+
+            {cartOpen && (
+                <View style={styles.cartOverlayContainer}>
+                    <TouchableOpacity style={styles.cartOverlayBackdrop} onPress={() => { setCartOpen(false); setOrderStatus(null); }} />
+                    <View style={styles.cartOverlay}>
+                        <View style={styles.cartHeader}>
+                            <Text style={styles.cartHeaderTitle}>Your Order</Text>
+                            <TouchableOpacity onPress={() => { setCartOpen(false); setOrderStatus(null); }}>
+                                <Ionicons name="close-circle" size={24} color={Colors.textSecondary} />
+                            </TouchableOpacity>
+                        </View>
+                            <ScrollView style={styles.cartItemsList}>
+                            {cart.items.map((entry) => (
+                                <View key={entry.item.id} style={styles.cartItem}>
+                                    <View>
+                                        <Text style={styles.cartItemName}>{entry.item.name}</Text>
+                                        <Text style={styles.cartItemMeta}>₹{entry.item.price} • {entry.quantity} pcs</Text>
+                                    </View>
+                                    <View style={styles.qtyCtrlBeautiful}>
+                                        <TouchableOpacity onPress={() => cart.decrementItem(entry.item.id)} style={styles.qtyBtnBeautiful}>
+                                            <Ionicons name="remove" size={16} color="#FFF" />
+                                        </TouchableOpacity>
+                                        <Text style={styles.qtyTextBeautiful}>{entry.quantity}</Text>
+                                        <TouchableOpacity onPress={() => cart.addItem(entry.item, entry.restaurantId)} style={styles.qtyBtnBeautiful}>
+                                            <Ionicons name="add" size={16} color="#FFF" />
+                                        </TouchableOpacity>
+                                    </View>
+                                </View>
+                            ))}
+                        </ScrollView>
+                        <View style={styles.cartSlotSection}>
+                            <Text style={styles.cartSlotLabel}>Pickup window (10 min)</Text>
+                            <TouchableOpacity
+                                style={[styles.dropdown, slotOpen && styles.dropdownActive]}
+                                onPress={() => setSlotOpen((prev) => !prev)}
+                                activeOpacity={0.8}
+                            >
+                                <Text style={[styles.dropdownLabel, selectedSlot ? styles.dropdownLabelActive : styles.dropdownPlaceholder]}>
+                                    {selectedSlot ?? 'Select a time slot'}
+                                </Text>
+                                <Ionicons name={slotOpen ? 'chevron-up' : 'chevron-down'} size={16} color={Colors.textSecondary} />
+                            </TouchableOpacity>
+                            {slotOpen && (
+                                <View style={styles.dropdownList}>
+                                    <ScrollView nestedScrollEnabled style={{ maxHeight: 160 }}>
+                                        {slots.map((slot) => (
+                                            <TouchableOpacity
+                                                key={slot}
+                                                style={styles.dropdownItem}
+                                                onPress={() => {
+                                                    setSelectedSlot(slot);
+                                                    setSlotOpen(false);
+                                                }}
+                                            >
+                                                <Text style={styles.dropdownItemText}>{slot}</Text>
+                                            </TouchableOpacity>
+                                        ))}
+                                    </ScrollView>
+                                </View>
+                            )}
+                        </View>
+                        <View style={styles.cartFooter}>
+                            <Text style={styles.cartFooterTotal}>Total ₹{cartTotal}</Text>
+                            {checkoutStep === 'review' ? (
+                                <TouchableOpacity
+                                    style={[styles.cartPrimaryBtn, !selectedSlot && styles.cartPrimaryBtnDisabled]}
+                                    onPress={() => {
+                                        if (!selectedSlot) {
+                                            setOrderStatus('Pick a pickup window before placing the order.');
+                                            return;
+                                        }
+                                        setCheckoutStep('payment');
+                                        setOrderStatus('Order placed — ready for payment.');
+                                    }}
+                                    disabled={!selectedSlot}
+                                >
+                                    <Text style={styles.cartPrimaryText}>Place order</Text>
+                                </TouchableOpacity>
+                            ) : (
+                                <TouchableOpacity
+                                    style={[styles.cartPrimaryBtn, styles.cartPrimaryBtnPay]}
+                                    onPress={() => {
+                                        setOrderStatus('Payment successful. Collect your meal at the counter.');
+                                        setQrPending(true);
+                                        setQrScanned(false);
+                                        setLastSlot(selectedSlot);
+                                        setQrCode(createQRCode('FOOD'));
+                                        cart.clearCart();
+                                        setSelectedSlot(null);
+                                        setTimeout(() => { setCartOpen(false); setOrderStatus(null); }, 800);
+                                        setCheckoutStep('review');
+                                    }}
+                                >
+                                    <Text style={styles.cartPrimaryText}>Pay now</Text>
+                                </TouchableOpacity>
+                            )}
+                        </View>
+                        {orderStatus && <Text style={styles.orderStatus}>{orderStatus}</Text>}
+                    </View>
+                </View>
+            )}
+            {qrPending && (
+                <Animated.View layout={Layout.springify()} style={[styles.qrCard, qrScanned && styles.qrCardCollected]}>
+                    <Text style={styles.qrLabel}>Order QR</Text>
+                    <Text style={styles.qrCode}>{qrCode}</Text>
+                    <Text style={styles.qrSlot}>Slot: {lastSlot ?? '—'}</Text>
+                    <Text style={styles.qrStatus}>
+                        {qrScanned ? 'Collected' : 'Pending collection — scan QR to confirm.'}
+                    </Text>
+                    {!qrScanned && (
+                        <TouchableOpacity
+                            style={styles.qrBtn}
+                            onPress={() => {
+                                setQrScanned(true);
+                                setOrderStatus('Order collected successfully.');
+                                setTimeout(() => {
+                                    setQrPending(false);
+                                    setLastSlot(null);
+                                }, 1200);
+                            }}
+                        >
+                            <Text style={styles.qrBtnText}>Scan</Text>
+                        </TouchableOpacity>
+                    )}
+                </Animated.View>
             )}
         </SafeAreaView>
     );
@@ -635,4 +793,177 @@ const styles = StyleSheet.create({
     cartBadgeText: { ...Typography.micro, color: '#FFF', fontWeight: '700' as const },
     cartLabel: { ...Typography.h5, color: '#FFF' },
     cartPrice: { ...Typography.h5, color: '#FFF' },
+    cartOverlayContainer: {
+        ...StyleSheet.absoluteFillObject,
+        zIndex: 100,
+    },
+    cartOverlayBackdrop: {
+        ...StyleSheet.absoluteFillObject,
+        backgroundColor: 'rgba(0,0,0,0.45)',
+    },
+    cartOverlay: {
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        padding: Spacing.lg,
+        backgroundColor: '#F9FAFB',
+        borderTopLeftRadius: Radius.xxl,
+        borderTopRightRadius: Radius.xxl,
+        maxHeight: '70%',
+    },
+    cartHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: Spacing.md,
+    },
+    cartHeaderTitle: {
+        ...Typography.h4,
+    },
+    cartItemsList: {
+        maxHeight: 220,
+        marginBottom: Spacing.md,
+    },
+    cartItem: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingVertical: Spacing.sm,
+        borderBottomWidth: 1,
+        borderColor: Colors.border,
+    },
+    cartItemName: {
+        ...Typography.body1,
+        fontWeight: '600',
+    },
+    cartItemMeta: {
+        ...Typography.caption,
+        color: Colors.textSecondary,
+    },
+    cartFooter: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
+    cartFooterTotal: {
+        ...Typography.h5,
+        fontWeight: '700',
+    },
+    cartPrimaryBtn: {
+        backgroundColor: Colors.primary,
+        paddingVertical: Spacing.sm,
+        paddingHorizontal: Spacing.lg,
+        borderRadius: Radius.lg,
+    },
+    cartPrimaryBtnPay: {
+        backgroundColor: '#0F172A',
+    },
+    cartPrimaryText: {
+        ...Typography.label,
+        color: '#FFF',
+        fontWeight: '700',
+    },
+    orderStatus: {
+        marginTop: Spacing.sm,
+        ...Typography.body2,
+        color: Colors.success,
+        textAlign: 'center',
+    },
+    cartSlotSection: {
+        marginBottom: Spacing.sm,
+    },
+    cartSlotLabel: {
+        ...Typography.caption,
+        color: Colors.textSecondary,
+        marginBottom: Spacing.xs,
+    },
+    dropdown: {
+        borderWidth: 1,
+        borderColor: Colors.border,
+        borderRadius: Radius.md,
+        paddingVertical: Spacing.sm,
+        paddingHorizontal: Spacing.md,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        backgroundColor: Colors.surface,
+    },
+    dropdownActive: {
+        borderColor: Colors.primary,
+    },
+    dropdownLabel: {
+        ...Typography.body2,
+    },
+    dropdownPlaceholder: {
+        color: Colors.textTertiary,
+    },
+    dropdownLabelActive: {
+        color: Colors.text,
+        fontWeight: '700',
+    },
+    dropdownList: {
+        marginTop: Spacing.sm,
+        borderWidth: 1,
+        borderColor: Colors.border,
+        borderRadius: Radius.md,
+        backgroundColor: Colors.cardBg,
+    },
+    dropdownItem: {
+        paddingVertical: Spacing.sm,
+        paddingHorizontal: Spacing.lg,
+    },
+    dropdownItemText: {
+        ...Typography.body2,
+        color: Colors.text,
+    },
+    cartPrimaryBtnDisabled: {
+        opacity: 0.5,
+    },
+    qrCard: {
+        position: 'absolute',
+        bottom: 90,
+        left: Spacing.section,
+        right: Spacing.section,
+        backgroundColor: '#FFF',
+        borderRadius: Radius.xl,
+        padding: Spacing.lg,
+        ...Shadows.lg,
+        alignItems: 'center',
+    },
+    qrCardCollected: {
+        borderWidth: 1,
+        borderColor: Colors.success,
+    },
+    qrLabel: {
+        ...Typography.caption,
+        color: Colors.textSecondary,
+        marginBottom: Spacing.xs,
+    },
+    qrCode: {
+        ...Typography.h3,
+        marginBottom: Spacing.xs,
+    },
+    qrSlot: {
+        ...Typography.body2,
+        color: Colors.textSecondary,
+    },
+    qrStatus: {
+        ...Typography.body2,
+        marginTop: Spacing.sm,
+        color: Colors.text,
+        textAlign: 'center',
+    },
+    qrBtn: {
+        marginTop: Spacing.sm,
+        backgroundColor: Colors.primary,
+        borderRadius: Radius.lg,
+        paddingVertical: Spacing.sm,
+        paddingHorizontal: Spacing.lg,
+    },
+    qrBtnText: {
+        ...Typography.label,
+        color: '#FFF',
+        fontWeight: '700',
+    },
 });

@@ -1,7 +1,7 @@
 export const quickActions = [
     { id: 'food', label: 'Food', emoji: '🍔', route: '/(tabs)/food' },
-    { id: 'events', label: 'Events', emoji: '🎟️', route: '/(tabs)/events' },
-    { id: 'academics', label: 'Grades', emoji: '📚', route: '/(tabs)/academics' },
+    { id: 'events', label: 'Events', emoji: '🎟️', route: '/(tabs)/explore' },
+    { id: 'academics', label: 'Grades', emoji: '📚', route: '/grades' },
     { id: 'map', label: 'Map', emoji: '🗺️', route: '/campus-map' },
     { id: 'challenge', label: 'Code', emoji: '💻', route: '/coding-challenge' },
     { id: 'teachers', label: 'Faculty', emoji: '👩‍🏫', route: '/teachers' },

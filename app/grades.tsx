@@ -7,12 +7,12 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import Card from '../../src/components/ui/Card';
-import ProgressRing from '../../src/components/ui/ProgressRing';
-import SectionHeader from '../../src/components/ui/SectionHeader';
-import TagPill from '../../src/components/ui/TagPill';
-import { academicProfile, assignments, subjects } from '../../src/data/academics';
-import { Colors, Radius, Shadows, Spacing, Typography } from '../../src/theme';
+import Card from '../src/components/ui/Card';
+import ProgressRing from '../src/components/ui/ProgressRing';
+import SectionHeader from '../src/components/ui/SectionHeader';
+import TagPill from '../src/components/ui/TagPill';
+import { academicProfile, assignments, subjects } from '../src/data/academics';
+import { Colors, Radius, Shadows, Spacing, Typography } from '../src/theme';
 
 export default function AcademicDashboard() {
     const nextAssignment = useMemo(

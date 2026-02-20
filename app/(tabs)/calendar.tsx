@@ -193,16 +193,19 @@ export default function CalendarScreen() {
     const [calYear, setCalYear] = useState(today.getFullYear());
     const [calMonth, setCalMonth] = useState(today.getMonth());
     const [selectedDate, setSelectedDate] = useState(initialDateString);
-    const [calExpanded, setCalExpanded] = useState(true);
+    const [viewMode, setViewMode] = useState<'upcoming' | 'calendar'>('upcoming');
     const [search, setSearch] = useState('');
     const [isSearching, setIsSearching] = useState(false);
+    const toggleViewMode = useCallback(() => {
+        setViewMode((mode) => (mode === 'upcoming' ? 'calendar' : 'upcoming'));
+    }, []);
     const listRef = useRef<SectionList>(null);
 
     const monthLabel = `${MONTHS[calMonth]} ${calYear} `;
     const todayEvents = events.filter((e) => e.date === TODAY_STR).length;
     const highlightEvent = useMemo(() => events.find((e) => e.date === TODAY_STR) ?? events[0], []);
 
-    const renderListHeader = () => (
+    const renderHeroHeader = () => (
         <>
             <View style={styles.calendarHeroWrap}>
                 <LinearGradient colors={['#170f33', '#1c1a4b']} style={styles.calendarHero}>
@@ -263,15 +266,10 @@ export default function CalendarScreen() {
                             <TouchableOpacity onPress={nextMonth} style={styles.navBtn}>
                                 <Ionicons name="chevron-forward" size={18} color={Colors.textSecondary} />
                             </TouchableOpacity>
-                            <TouchableOpacity
-                                style={styles.expandBtn}
-                                onPress={() => setCalExpanded((v) => !v)}
-                            >
-                                <Ionicons
-                                    name={calExpanded ? 'chevron-up' : 'chevron-down'}
-                                    size={18}
-                                    color={Colors.textSecondary}
-                                />
+                            <TouchableOpacity onPress={toggleViewMode} style={[styles.viewToggleBtn, viewMode === 'calendar' && styles.viewToggleActive]}>
+                                <Text style={[styles.viewToggleText, viewMode === 'calendar' && styles.viewToggleTextActive]}>
+                                    {viewMode === 'calendar' ? 'Show Upcoming' : 'Show Calendar'}
+                                </Text>
                             </TouchableOpacity>
                             <View style={styles.avatar}>
                                 <Text style={styles.avatarText}>Y</Text>
@@ -280,20 +278,12 @@ export default function CalendarScreen() {
                     </>
                 )}
             </View>
+        </>
+    );
 
-            {calExpanded && (
-                <View style={styles.calCard}>
-                    <MiniCal
-                        year={calYear}
-                        month={calMonth}
-                        selectedDate={selectedDate}
-                        onSelect={handleDaySelect}
-                        eventDates={EVENT_DATE_SET}
-                        eventsData={events}
-                    />
-                </View>
-            )}
-
+    const renderListHeader = () => (
+        <>
+            {renderHeroHeader()}
             <View style={styles.divider}>
                 <Text style={styles.dividerText}>UPCOMING EVENTS</Text>
             </View>
@@ -329,7 +319,80 @@ export default function CalendarScreen() {
         }
     }, []);
 
+    const detailEvents = useMemo(() => events.filter((e) => e.date === selectedDate), [selectedDate]);
+    const selectedDateLabel = useMemo(() => {
+        const [y, m, d] = selectedDate.split('-').map(Number);
+        if (!y || isNaN(m) || isNaN(d)) return 'Selected day';
+        return `${d} ${MONTHS[m - 1]} ${y}`;
+    }, [selectedDate]);
 
+    const renderEventCard = (ev: typeof events[number]) => {
+        const col = CAT_COLORS[ev.category] ?? DEFAULT_CAT;
+        return (
+            <TouchableOpacity
+                key={ev.id}
+                activeOpacity={0.85}
+                style={[styles.eventCard, { borderLeftColor: col.border }]}
+            >
+                <View style={[styles.eventCardBg, { backgroundColor: col.bg }]}>
+                    <View style={styles.eventCardTop}>
+                        <View style={[styles.catPill, { backgroundColor: col.border }]}>
+                            <Ionicons name="pricetag" size={10} color="#FFF" style={{ marginRight: 4 }} />
+                            <Text style={styles.catPillText}>{ev.category}</Text>
+                        </View>
+                        {ev.seatsLeft <= 15 && (
+                            <View style={styles.urgencyPill}>
+                                <Text style={styles.urgencyText}>⚡ {ev.seatsLeft} left</Text>
+                            </View>
+                        )}
+                    </View>
+                    <Text style={[styles.eventTitle, { color: col.text }]} numberOfLines={2}>
+                        {ev.emoji ? `${ev.emoji} ` : ''}{ev.title}
+                    </Text>
+                    <View style={styles.eventMeta}>
+                        <Ionicons name="time-outline" size={12} color={col.meta} />
+                        <Text style={[styles.eventMetaText, { color: col.meta }]}>{ev.time}</Text>
+                        <Text style={styles.eventMetaDot}>·</Text>
+                        <Ionicons name="location-outline" size={12} color={col.meta} />
+                        <Text style={[styles.eventMetaText, { color: col.meta }]}>{ev.venue}</Text>
+                    </View>
+                </View>
+            </TouchableOpacity>
+        );
+    };
+
+
+
+    if (viewMode === 'calendar') {
+        return (
+            <SafeAreaView style={styles.safe} edges={['top']}>
+                {renderHeroHeader()}
+                <View style={styles.calendarModeWrap}>
+                    <View style={styles.calCard}>
+                        <MiniCal
+                            year={calYear}
+                            month={calMonth}
+                            selectedDate={selectedDate}
+                            onSelect={handleDaySelect}
+                            eventDates={EVENT_DATE_SET}
+                            eventsData={events}
+                        />
+                    </View>
+                    <View style={styles.calendarDivider}>
+                        <Text style={styles.calendarDividerText}>{selectedDateLabel}</Text>
+                    </View>
+                    {detailEvents.length > 0 ? (
+                        detailEvents.map((ev) => renderEventCard(ev))
+                    ) : (
+                        <View style={styles.calendarEmpty}>
+                            <Text style={styles.calendarEmptyTitle}>No events scheduled</Text>
+                            <Text style={styles.calendarEmptySub}>Try another day or switch to upcoming events.</Text>
+                        </View>
+                    )}
+                </View>
+            </SafeAreaView>
+        );
+    }
 
     return (
         <SafeAreaView style={styles.safe} edges={['top']}>
@@ -383,41 +446,7 @@ export default function CalendarScreen() {
                         <Text style={styles.emptyStateSub}>Take a break or check other days!</Text>
                     </View>
                 )}
-                renderItem={({ item: ev, section }) => {
-                    // Only render if there's actually data
-                    if (section.data.length === 0) return null;
-                    const col = CAT_COLORS[ev.category] ?? DEFAULT_CAT;
-                    return (
-                        <TouchableOpacity
-                            activeOpacity={0.85}
-                            style={[styles.eventCard, { borderLeftColor: col.border }]}
-                        >
-                            <View style={[styles.eventCardBg, { backgroundColor: col.bg }]}>
-                                <View style={styles.eventCardTop}>
-                                    <View style={[styles.catPill, { backgroundColor: col.border }]}>
-                                        <Ionicons name="pricetag" size={10} color="#FFF" style={{ marginRight: 4 }} />
-                                        <Text style={styles.catPillText}>{ev.category}</Text>
-                                    </View>
-                                    {ev.seatsLeft <= 15 && (
-                                        <View style={styles.urgencyPill}>
-                                            <Text style={styles.urgencyText}>⚡ {ev.seatsLeft} left</Text>
-                                        </View>
-                                    )}
-                                </View>
-                                <Text style={[styles.eventTitle, { color: col.text }]} numberOfLines={2}>
-                                    {ev.emoji ? `${ev.emoji} ` : ''}{ev.title}
-                                </Text>
-                                <View style={styles.eventMeta}>
-                                    <Ionicons name="time-outline" size={12} color={col.meta} />
-                                    <Text style={[styles.eventMetaText, { color: col.meta }]}>{ev.time}</Text>
-                                    <Text style={styles.eventMetaDot}>·</Text>
-                                    <Ionicons name="location-outline" size={12} color={col.meta} />
-                                    <Text style={[styles.eventMetaText, { color: col.meta }]}>{ev.venue}</Text>
-                                </View>
-                            </View>
-                        </TouchableOpacity>
-                    );
-                }}
+                renderItem={({ item: ev }) => renderEventCard(ev)}
             />
 
             {/* ═══ FAB ═══ */}
@@ -521,10 +550,22 @@ const styles = StyleSheet.create({
         alignItems: 'center', justifyContent: 'center',
         backgroundColor: Colors.surface,
     },
-    expandBtn: {
-        width: 32, height: 32, borderRadius: 16,
-        alignItems: 'center', justifyContent: 'center',
+    viewToggleBtn: {
+        paddingHorizontal: Spacing.md,
+        paddingVertical: Spacing.xs,
+        borderRadius: Radius.xl,
         backgroundColor: Colors.surface,
+    },
+    viewToggleActive: {
+        backgroundColor: Colors.primary,
+    },
+    viewToggleText: {
+        ...Typography.caption,
+        color: Colors.textSecondary,
+        fontWeight: '700' as const,
+    },
+    viewToggleTextActive: {
+        color: '#FFF',
     },
     avatar: {
         width: 32, height: 32, borderRadius: 16,
@@ -540,6 +581,19 @@ const styles = StyleSheet.create({
         borderBottomWidth: 1,
         borderBottomColor: Colors.border,
         paddingTop: Spacing.sm,
+    },
+    calendarModeWrap: {
+        flex: 1,
+        paddingBottom: Spacing.md,
+    },
+    calendarDivider: {
+        paddingHorizontal: Spacing.section,
+        paddingVertical: Spacing.sm,
+        backgroundColor: '#F3F3F7',
+    },
+    calendarDividerText: {
+        ...Typography.h4,
+        color: Colors.textSecondary,
     },
 
     // Divider
@@ -611,6 +665,11 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         gap: 8,
     },
+    eventTime: {
+        ...Typography.caption,
+        color: Colors.textSecondary,
+        fontWeight: '600' as const,
+    },
     catPill: {
         borderRadius: Radius.pill,
         paddingHorizontal: 8,
@@ -644,5 +703,21 @@ const styles = StyleSheet.create({
     emptyState: { alignItems: 'center', justifyContent: 'center', padding: Spacing.xl, marginTop: Spacing.lg },
     emptyStateImg: { width: 120, height: 120, opacity: 0.8, marginBottom: Spacing.md },
     emptyStateTitle: { ...Typography.h4, color: Colors.text, marginBottom: 4 },
-    emptyStateSub: { ...Typography.body2, color: Colors.textSecondary, textAlign: 'center' }
+    emptyStateSub: { ...Typography.body2, color: Colors.textSecondary, textAlign: 'center' },
+    calendarEmpty: {
+        paddingHorizontal: Spacing.section,
+        paddingVertical: Spacing.md,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    calendarEmptyTitle: {
+        ...Typography.h4,
+        color: Colors.textSecondary,
+        marginBottom: Spacing.xs,
+    },
+    calendarEmptySub: {
+        ...Typography.body2,
+        color: Colors.textTertiary,
+        textAlign: 'center',
+    },
 });
