@@ -9,6 +9,7 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { events } from '../../src/data/events';
 import { Colors, Radius, Shadows, Spacing, Typography } from '../../src/theme';
@@ -198,41 +199,39 @@ export default function CalendarScreen() {
     const listRef = useRef<SectionList>(null);
 
     const monthLabel = `${MONTHS[calMonth]} ${calYear} `;
+    const todayEvents = events.filter((e) => e.date === TODAY_STR).length;
+    const highlightEvent = useMemo(() => events.find((e) => e.date === TODAY_STR) ?? events[0], []);
 
-    const searchLower = search.trim().toLowerCase();
+    const renderListHeader = () => (
+        <>
+            <View style={styles.calendarHeroWrap}>
+                <LinearGradient colors={['#170f33', '#1c1a4b']} style={styles.calendarHero}>
+                    <Text style={styles.calendarHeroTitle}>Campus calendar</Text>
+                    <Text style={styles.calendarHeroSub}>Stay ahead of deadlines & club alerts</Text>
+                    <View style={styles.calendarHeroStats}>
+                        <View>
+                            <Text style={styles.calendarHeroValue}>{events.length}</Text>
+                            <Text style={styles.calendarHeroLabel}>Total events</Text>
+                        </View>
+                        <View>
+                            <Text style={styles.calendarHeroValue}>{todayEvents}</Text>
+                            <Text style={styles.calendarHeroLabel}>Today</Text>
+                        </View>
+                        <View>
+                            <Text style={styles.calendarHeroValue}>{EVENT_DATE_SET.size}</Text>
+                            <Text style={styles.calendarHeroLabel}>Event days</Text>
+                        </View>
+                    </View>
+                    <View style={styles.highlightCard}>
+                        <Text style={styles.highlightLabel}>Next up</Text>
+                        <Text style={styles.highlightTitle} numberOfLines={1}>
+                            {highlightEvent.emoji ? `${highlightEvent.emoji} ` : ''}{highlightEvent.title}
+                        </Text>
+                        <Text style={styles.highlightMeta}>{highlightEvent.date} · {highlightEvent.time}</Text>
+                    </View>
+                </LinearGradient>
+            </View>
 
-    // Filter sections based on search
-    const filteredSections = useMemo(() => {
-        if (!searchLower) return SECTIONS;
-        return SECTIONS.map(sec => ({
-            ...sec,
-            data: sec.data.filter(ev =>
-                ev.title.toLowerCase().includes(searchLower) ||
-                ev.category.toLowerCase().includes(searchLower)
-            )
-        })).filter(sec => sec.data.length > 0);
-    }, [searchLower]);
-
-    const prevMonth = useCallback(() => {
-        setCalMonth((m) => { if (m === 0) { setCalYear((y) => y - 1); return 11; } return m - 1; });
-    }, []);
-    const nextMonth = useCallback(() => {
-        setCalMonth((m) => { if (m === 11) { setCalYear((y) => y + 1); return 0; } return m + 1; });
-    }, []);
-
-    const handleDaySelect = useCallback((ds: string) => {
-        setSelectedDate(ds);
-        const idx = SECTIONS.findIndex((s) => s.dateStr === ds);
-        if (idx !== -1 && listRef.current) {
-            listRef.current.scrollToLocation({ sectionIndex: idx, itemIndex: 0, animated: true, viewOffset: 0 });
-        }
-    }, []);
-
-
-
-    return (
-        <SafeAreaView style={styles.safe} edges={['top']}>
-            {/* ═══ HEADER ═══ */}
             <View style={styles.header}>
                 {isSearching ? (
                     <View style={styles.searchBarActive}>
@@ -282,7 +281,6 @@ export default function CalendarScreen() {
                 )}
             </View>
 
-            {/* ═══ MINI MONTH GRID (collapsible) ═══ */}
             {calExpanded && (
                 <View style={styles.calCard}>
                     <MiniCal
@@ -296,12 +294,45 @@ export default function CalendarScreen() {
                 </View>
             )}
 
-            {/* ═══ AGENDA DIVIDER ═══ */}
             <View style={styles.divider}>
                 <Text style={styles.dividerText}>UPCOMING EVENTS</Text>
             </View>
+        </>
+    );
 
-            {/* ═══ AGENDA LIST ═══ */}
+    const searchLower = search.trim().toLowerCase();
+
+    // Filter sections based on search
+    const filteredSections = useMemo(() => {
+        if (!searchLower) return SECTIONS;
+        return SECTIONS.map(sec => ({
+            ...sec,
+            data: sec.data.filter(ev =>
+                ev.title.toLowerCase().includes(searchLower) ||
+                ev.category.toLowerCase().includes(searchLower)
+            )
+        })).filter(sec => sec.data.length > 0);
+    }, [searchLower]);
+
+    const prevMonth = useCallback(() => {
+        setCalMonth((m) => { if (m === 0) { setCalYear((y) => y - 1); return 11; } return m - 1; });
+    }, []);
+    const nextMonth = useCallback(() => {
+        setCalMonth((m) => { if (m === 11) { setCalYear((y) => y + 1); return 0; } return m + 1; });
+    }, []);
+
+    const handleDaySelect = useCallback((ds: string) => {
+        setSelectedDate(ds);
+        const idx = SECTIONS.findIndex((s) => s.dateStr === ds);
+        if (idx !== -1 && listRef.current) {
+            listRef.current.scrollToLocation({ sectionIndex: idx, itemIndex: 0, animated: true, viewOffset: 0 });
+        }
+    }, []);
+
+
+
+    return (
+        <SafeAreaView style={styles.safe} edges={['top']}>
             <SectionList
                 ref={listRef}
                 sections={filteredSections}
@@ -309,6 +340,7 @@ export default function CalendarScreen() {
                 showsVerticalScrollIndicator={false}
                 stickySectionHeadersEnabled={false}
                 contentContainerStyle={styles.listContent}
+                ListHeaderComponent={renderListHeader}
                 renderSectionHeader={({ section }) => (
                     <View>
                         {section.isNewMonth && (
@@ -400,6 +432,59 @@ export default function CalendarScreen() {
 
 const styles = StyleSheet.create({
     safe: { flex: 1, backgroundColor: '#F7F7F8' },
+    calendarHeroWrap: {
+        paddingHorizontal: Spacing.section,
+        paddingTop: Spacing.sm,
+    },
+    calendarHero: {
+        borderRadius: Radius.xxl,
+        padding: Spacing.lg,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.2)',
+        overflow: 'hidden',
+        ...Shadows.lg,
+    },
+    calendarHeroTitle: {
+        ...Typography.h3,
+        color: '#FFF',
+    },
+    calendarHeroSub: {
+        ...Typography.body2,
+        color: 'rgba(255,255,255,0.75)',
+        marginBottom: Spacing.sm,
+    },
+    calendarHeroStats: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginBottom: Spacing.sm,
+    },
+    calendarHeroValue: {
+        ...Typography.h3,
+        color: '#FFF',
+    },
+    calendarHeroLabel: {
+        ...Typography.caption,
+        color: 'rgba(255,255,255,0.7)',
+    },
+    highlightCard: {
+        marginTop: Spacing.sm,
+        backgroundColor: 'rgba(255,255,255,0.1)',
+        borderRadius: Radius.xl,
+        padding: Spacing.md,
+    },
+    highlightLabel: {
+        ...Typography.micro,
+        color: 'rgba(255,255,255,0.65)',
+    },
+    highlightTitle: {
+        ...Typography.h4,
+        color: '#FFF',
+        marginVertical: Spacing.xs,
+    },
+    highlightMeta: {
+        ...Typography.caption,
+        color: 'rgba(255,255,255,0.8)',
+    },
 
     // Header
     header: {

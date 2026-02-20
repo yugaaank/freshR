@@ -26,10 +26,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { events } from '../../src/data/events';
 import { campusAlerts } from '../../src/data/homeData';
 import { Colors, Radius, Shadows, Spacing, Typography } from '../../src/theme';
+import TagPill from '../../src/components/ui/TagPill';
 
 const { width: SW } = Dimensions.get('window');
 const CARD_GAP = 12;
 const CARD_SIZE = (SW - Spacing.section * 2 - CARD_GAP) / 2;
+
+const featuredEvent = events.find((ev) => ev.isFeatured) ?? events[0];
 
 // ─── Service cards (Swiggy-style 2×2 grid) ───────────────────────────────────
 const SERVICE_CARDS = [
@@ -194,22 +197,24 @@ export default function HomeScreen() {
         scrollEventThrottle={16}
         contentContainerStyle={styles.scroll}
       >
-        {/* ═══ PROMO BANNER (Blinkit ₹50 OFF style) ═══ */}
-        <SpringCard style={styles.promoBannerWrap} delay={100} onPress={() => router.push('/(tabs)/explore')}>
+        {/* ═══ FEATURED EVENT HERO ═══ */}
+        <SpringCard style={styles.featureBannerWrap} delay={100} onPress={() => router.push(`/event/${featuredEvent.id}` as any)}>
           <LinearGradient
-            colors={['#1A5C3A', '#0D3D27']}
+            colors={['#14172B', '#1C1C1E']}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
-            style={styles.promoBanner}
+            style={styles.featureBanner}
           >
-            <View style={styles.promoLeft}>
-              <Text style={styles.promoSmall}>TODAY&apos;S HIGHLIGHT</Text>
-              <Text style={styles.promoTitle}>HackMIT{'\n'}This Weekend 🚀</Text>
-              <View style={styles.promoCta}>
-                <Text style={styles.promoCtaText}>EXPLORE EVENTS</Text>
+            <View>
+              <Text style={styles.featureLabel}>Spotlight</Text>
+              <Text style={styles.featureTitle}>{featuredEvent.title}</Text>
+              <Text style={styles.featureMeta}>{featuredEvent.date} · {featuredEvent.time}</Text>
+              <View style={styles.featureBadgeRow}>
+                <TagPill label={featuredEvent.category} variant="orange" size="sm" />
+                <Text style={styles.featureBadgeText}>{featuredEvent.seatsLeft} seats left</Text>
               </View>
             </View>
-            <Text style={styles.promoEmoji}>🏆</Text>
+            <Text style={styles.featureEmoji}>{featuredEvent.emoji ?? '🎫'}</Text>
           </LinearGradient>
         </SpringCard>
 
@@ -430,30 +435,50 @@ const styles = StyleSheet.create({
   scroll: { paddingBottom: 110 },
 
   // ── Promo banner (Blinkit ₹50 OFF style) ──
-  promoBannerWrap: {
+  featureBannerWrap: {
     marginHorizontal: Spacing.section,
     marginBottom: Spacing.md,
-    borderRadius: 24,
+    borderRadius: Radius.xxl,
     overflow: 'hidden',
   },
-  promoBanner: {
-    padding: Spacing.xl,
+  featureBanner: {
+    padding: Spacing.lg,
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
+    minHeight: 170,
+    alignItems: 'flex-start',
+    gap: Spacing.sm,
   },
-  promoLeft: { flex: 1 },
-  promoSmall: { ...Typography.micro, color: 'rgba(255,255,255,0.65)', letterSpacing: 1.5, marginBottom: 4 },
-  promoTitle: { ...Typography.h3, color: '#FFF', lineHeight: 28, marginBottom: Spacing.md },
-  promoCta: {
-    alignSelf: 'flex-start',
-    backgroundColor: Colors.primary,
-    borderRadius: Radius.pill,
-    paddingHorizontal: 16,
-    paddingVertical: 7,
+  featureLabel: {
+    ...Typography.micro,
+    color: Colors.tagPurpleTxt,
+    letterSpacing: 1.2,
+    marginBottom: Spacing.xs,
   },
-  promoCtaText: { ...Typography.label, color: '#FFF', fontWeight: '700' as const, fontSize: 12 },
-  promoEmoji: { fontSize: 72, marginLeft: Spacing.md },
+  featureTitle: {
+    ...Typography.h3,
+    color: '#FFF',
+    marginBottom: Spacing.xs,
+    lineHeight: 26,
+  },
+  featureMeta: {
+    ...Typography.body2,
+    color: 'rgba(255,255,255,0.7)',
+    marginBottom: Spacing.sm,
+  },
+  featureBadgeRow: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
+    alignItems: 'center',
+  },
+  featureBadgeText: {
+    ...Typography.caption,
+    color: '#FFF',
+    opacity: 0.7,
+  },
+  featureEmoji: {
+    fontSize: 48,
+  },
 
   // ── Campus Alerts ──
   alertRow: {

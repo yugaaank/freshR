@@ -1,10 +1,11 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
     ScrollView,
     StyleSheet,
     Text,
     View
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Card from '../../src/components/ui/Card';
 import ProgressRing from '../../src/components/ui/ProgressRing';
@@ -14,6 +15,18 @@ import { academicProfile, assignments, subjects } from '../../src/data/academics
 import { Colors, Radius, Shadows, Spacing, Typography } from '../../src/theme';
 
 export default function AcademicDashboard() {
+    const nextAssignment = useMemo(
+        () => assignments.find((a) => a.status === 'pending') ?? assignments[0],
+        []
+    );
+    const focusSubject = useMemo(
+        () => subjects.slice().sort((a, b) => b.gradePoint - a.gradePoint)[0],
+        []
+    );
+    const pendingAssignments = useMemo(
+        () => assignments.filter((a) => a.status === 'pending').length,
+        []
+    );
     return (
         <SafeAreaView style={styles.safe} edges={['top']}>
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
@@ -63,7 +76,26 @@ export default function AcademicDashboard() {
                 </View>
 
                 {/* ═══ SUBJECTS ═══ */}
-                <SectionHeader title="Subjects" subtitle="Current Semester" style={{ marginTop: Spacing.xl }} />
+                <LinearGradient colors={['#120A3E', '#1E1B3B', '#2B2D4B']} style={styles.heroBanner}>
+                    <Text style={styles.heroLabel}>Focus today</Text>
+                    <Text style={styles.heroTitle}>{focusSubject.name}</Text>
+                    <Text style={styles.heroSubtitle}>Next: {focusSubject.nextClass} · {nextAssignment?.title}</Text>
+                    <View style={styles.heroStats}>
+                        <View style={styles.heroStat}>
+                            <Text style={styles.heroStatValue}>{academicProfile.cgpa}</Text>
+                            <Text style={styles.heroStatLabel}>Current CGPA</Text>
+                        </View>
+                        <View style={styles.heroStat}>
+                            <Text style={styles.heroStatValue}>{pendingAssignments}</Text>
+                            <Text style={styles.heroStatLabel}>Assignments left</Text>
+                        </View>
+                        <View style={styles.heroStat}>
+                            <Text style={styles.heroStatValue}>{academicProfile.earnedCredits}</Text>
+                            <Text style={styles.heroStatLabel}>Credits</Text>
+                        </View>
+                    </View>
+                </LinearGradient>
+                <SectionHeader title="Subjects" subtitle="Current semester" style={{ marginTop: Spacing.xl }} />
                 <View style={styles.subjectList}>
                     {subjects.map((subject) => {
                         const att = subject.attendance;
@@ -154,6 +186,46 @@ const styles = StyleSheet.create({
     },
     pageTitle: { ...Typography.h1, color: Colors.text },
     pageSubtitle: { ...Typography.body2, color: Colors.textSecondary, marginTop: 4 },
+    heroBanner: {
+        marginHorizontal: Spacing.section,
+        borderRadius: Radius.xxl,
+        padding: Spacing.lg,
+        backgroundColor: '#120A3E',
+        marginBottom: Spacing.md,
+        marginTop: Spacing.md,
+    },
+    heroLabel: {
+        ...Typography.micro,
+        color: 'rgba(255,255,255,0.7)',
+    },
+    heroTitle: {
+        ...Typography.h3,
+        color: '#FFF',
+        marginTop: Spacing.xs,
+        marginBottom: Spacing.xs,
+    },
+    heroSubtitle: {
+        ...Typography.body2,
+        color: 'rgba(255,255,255,0.8)',
+        marginBottom: Spacing.md,
+    },
+    heroStats: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        gap: Spacing.md,
+    },
+    heroStat: {
+        flex: 1,
+    },
+    heroStatValue: {
+        ...Typography.h4,
+        color: '#FFF',
+        fontWeight: '700' as const,
+    },
+    heroStatLabel: {
+        ...Typography.caption,
+        color: 'rgba(255,255,255,0.65)',
+    },
 
     // Dark metrics card
     metricsCard: {
@@ -164,6 +236,7 @@ const styles = StyleSheet.create({
         overflow: 'hidden',
         borderTopWidth: 1,
         borderTopColor: Colors.highlight,
+        marginBottom: Spacing.md,
     },
     metricsBgCircle: {
         position: 'absolute',

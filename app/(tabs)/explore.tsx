@@ -1,46 +1,39 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
     FlatList,
     Image,
-    ImageBackground,
     ScrollView,
     StatusBar,
     StyleSheet,
     Text,
     TouchableOpacity,
-    View
+    View,
 } from 'react-native';
 import Animated, { FadeInDown, useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Card from '../../src/components/ui/Card';
+import SectionHeader from '../../src/components/ui/SectionHeader';
 import TagPill from '../../src/components/ui/TagPill';
 import { useHybridStore } from '../../src/store/hybridStore';
 import { Colors, Radius, Shadows, Spacing, Typography } from '../../src/theme';
 
 const AnimatedPressable = Animated.createAnimatedComponent(TouchableOpacity);
 
-const CATEGORY_COLORS: Record<string, string> = {
-    Tech: '#007AFF', Music: '#FF2D55', Sports: '#34C759',
-    Cultural: '#AF52DE', Workshop: '#FF9500', Academic: '#5856D6', All: '#6B6B6B',
-};
-
-const CAT_ICONS: Record<string, any> = {
-    Tech: 'laptop-outline', Music: 'musical-notes-outline', Sports: 'football-outline',
-    Cultural: 'color-palette-outline', Workshop: 'hammer-outline', Academic: 'book-outline', All: 'ticket-outline',
-};
-
 function SpringCard({ children, style, onPress, delay = 0, entering, ...props }: any) {
     const scale = useSharedValue(1);
     const animatedStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
-
     return (
         <AnimatedPressable
             activeOpacity={0.9}
-            onPressIn={() => { scale.value = withSpring(0.96, { damping: 15, stiffness: 200 }); }}
-            onPressOut={() => { scale.value = withSpring(1, { damping: 15, stiffness: 200 }); }}
+            onPressIn={() => {
+                scale.value = withSpring(0.96, { damping: 15, stiffness: 200 });
+            }}
+            onPressOut={() => {
+                scale.value = withSpring(1, { damping: 15, stiffness: 200 });
+            }}
             onPress={onPress}
             style={[style, animatedStyle]}
             entering={entering ? entering.delay(delay).springify() : FadeInDown.delay(delay).springify()}
@@ -51,312 +44,349 @@ function SpringCard({ children, style, onPress, delay = 0, entering, ...props }:
     );
 }
 
+type FilterType = 'all' | 'clubs' | 'depts' | 'public';
+
 export default function ExploreScreen() {
     const { filter: initialFilter } = useLocalSearchParams<{ filter?: string }>();
     const { clubs, events, user } = useHybridStore();
-
-    // Type definitions for the selected tab
-    type FilterType = 'all' | 'clubs' | 'depts' | 'public';
     const [activeFilter, setActiveFilter] = useState<FilterType>((initialFilter as FilterType) || 'all');
 
-    // Make sure to sync with initial filter if routed here
-    useEffect(() => {
-        if (initialFilter) setActiveFilter(initialFilter as FilterType);
-    }, [initialFilter]);
-
-    const getTypeLabel = (vibe: string) => {
-        if (vibe.toLowerCase().includes('tech')) return 'Department';
-        return 'Club';
-    };
+    const heroStats = useMemo(
+        () => [
+            { label: 'Clubs followed', value: user.followedClubs.length },
+            { label: 'Live events', value: events.length },
+            { label: 'Active streak', value: '14 days' },
+        ],
+        [user.followedClubs.length, events.length]
+    );
 
     const chips: { id: FilterType; label: string }[] = [
-        { id: 'all', label: 'All Events' },
+        { id: 'all', label: 'All' },
         { id: 'clubs', label: 'Clubs' },
         { id: 'depts', label: 'Departments' },
-        { id: 'public', label: 'Public Events' },
+        { id: 'public', label: 'Public' },
     ];
 
-    const renderClubRow = ({ item, index }: { item: typeof clubs[0], index: number }) => {
-        return (
-            <SpringCard
-                delay={index * 50}
-                onPress={() => router.push(`/club/${item.id}` as any)}
-                style={styles.clubCardContainer}
-            >
-                <ImageBackground
-                    source={{ uri: item.banner }}
-                    style={styles.clubCardBanner}
-                    imageStyle={{ borderRadius: Radius.lg }}
-                >
-                    <LinearGradient
-                        colors={['rgba(0,0,0,0.1)', 'rgba(0,0,0,0.85)']}
-                        style={styles.clubCardGradient}
-                    >
-                        <Image source={{ uri: item.logo }} style={styles.clubCardLogo} />
-                        <View style={styles.clubCardContent}>
-                            <Text style={styles.clubCardTitle} numberOfLines={1}>{item.name}</Text>
-                            <Text style={styles.clubCardSubtitle} numberOfLines={1}>
-                                {getTypeLabel(item.vibeTag)}
-                            </Text>
-                            <Text style={styles.clubCardFollowers} numberOfLines={1}>
-                                {item.followersCount} Followers
-                            </Text>
-                        </View>
-                    </LinearGradient>
-                </ImageBackground>
-            </SpringCard>
-        );
-    };
+    const getClubLabel = (vibe: string) => (vibe.toLowerCase().includes('tech') ? 'Department' : 'Club');
+    const featuredClubs = clubs.slice(0, 3);
+    const spotlightEvent = events.find((ev) => ev.isFeatured) ?? events[0];
 
-    const renderEventRow = ({ item, index }: { item: typeof events[0], index: number }) => {
-        const isRegistered = user.registeredEvents.includes(item.id);
-        const seatsLeft = item.totalSeats - item.registeredCount;
-        const categoryBg: Record<string, string> = {
-            Tech: '#0A2540', Music: '#2D0A1A', Sports: '#0A2D14',
-            Cultural: '#1A0A2D', Workshop: '#2D1A0A', Academic: '#0A0A2D', Competitive: '#2A0A0A',
-        };
-        const bgColor = categoryBg[item.category] ?? '#1A1A2E';
-
-        return (
-            <SpringCard
-                delay={index * 50}
-                onPress={() => router.push(`/event/${item.id}` as any)}
-                style={{ marginBottom: Spacing.lg }}
-            >
-                <Card style={StyleSheet.flatten([styles.eventRow, { borderLeftWidth: 4, borderLeftColor: CATEGORY_COLORS[item.category] || Colors.primary }])} padding={0} shadow="sm">
-                    {/* Left image block */}
-                    <LinearGradient
-                        colors={[bgColor, '#000000']}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 0, y: 1 }}
-                        style={styles.eventRowImage}
-                    >
-                        <Ionicons name={CAT_ICONS[item.category] || 'ticket-outline'} size={32} color="rgba(255,255,255,0.9)" />
-                    </LinearGradient>
-                    {/* Content */}
-                    <View style={styles.eventRowContent}>
-                        <View style={styles.eventRowTop}>
-                            <TagPill label={item.category} variant="blue" size="sm" />
-                            {seatsLeft < 30 && (
-                                <Text style={styles.seatsLeft}>⚡ {seatsLeft} left</Text>
-                            )}
-                        </View>
-                        <Text style={styles.eventRowTitle} numberOfLines={2}>{item.title}</Text>
-                        <Text style={styles.eventRowMeta}>{new Date(item.date).toLocaleString('default', { month: 'short', day: 'numeric' })} · {item.time} · {item.location}</Text>
-
-                        <View style={styles.eventRowBottom}>
-                            <Text style={styles.eventRowPrice}>Free</Text>
-                            {isRegistered && (
-                                <View style={styles.explicitBadge}>
-                                    <Text style={styles.explicitText}>REGISTERED</Text>
-                                </View>
-                            )}
-                        </View>
-                    </View>
-                </Card>
-            </SpringCard>
-        );
-    };
-
-    // Derived filtering logic
-    let listData: any[] = [];
-    let renderFunc = renderClubRow;
-
-    if (activeFilter === 'all') {
-        // All events occurring "this week" (for mockup purposes, showing all events sorted by date)
-        listData = [...events].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-        renderFunc = renderEventRow as any;
-    } else if (activeFilter === 'clubs') {
-        listData = clubs.filter(c => !c.vibeTag.toLowerCase().includes('tech'));
-        renderFunc = renderClubRow as any;
-    } else if (activeFilter === 'depts') {
-        listData = clubs.filter(c => c.vibeTag.toLowerCase().includes('tech'));
-        renderFunc = renderClubRow as any;
-    } else if (activeFilter === 'public') {
-        // Events that do not belong to any specific club list (in our mock data, club hosts are just strings instead of ids)
-        // For demonstration, let's treat any event where host is "HackMIT" or "Admin" as public
-        listData = events.filter(e => e.host?.toLowerCase().includes('hackmit') || e.host?.toLowerCase().includes('university'));
-        renderFunc = renderEventRow as any;
-    }
+    const filteredEvents = useMemo(() => {
+        if (activeFilter === 'public') {
+            return events.filter(
+                (ev) =>
+                    ev.host?.toLowerCase().includes('hackmit') ||
+                    ev.host?.toLowerCase().includes('university')
+            );
+        }
+        const sorted = [...events].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+        return activeFilter === 'clubs' || activeFilter === 'depts' ? [] : sorted;
+    }, [activeFilter, events]);
 
     return (
         <SafeAreaView style={styles.safe} edges={['top']}>
             <StatusBar barStyle="light-content" />
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContentEnhanced}>
+                <View style={styles.heroWrapper}>
+                    <LinearGradient colors={['#0A0C24', '#120A3E']} style={styles.heroBackground}>
+                        <Text style={styles.heroTitle}>Explore Campus</Text>
+                        <Text style={styles.heroSubtitle}>Clubs, spaces, and events curated for your vibe.</Text>
+                        <View style={styles.heroStats}>
+                            {heroStats.map((stat) => (
+                                <View key={stat.label} style={styles.heroStat}>
+                                    <Text style={styles.heroStatValue}>{stat.value}</Text>
+                                    <Text style={styles.heroStatLabel}>{stat.label}</Text>
+                                </View>
+                            ))}
+                        </View>
+                    </LinearGradient>
+                </View>
 
-            {/* Standard Header */}
-            <View style={styles.header}>
-                <Text style={styles.headerTitle}>Explore</Text>
-            </View>
-
-            {/* Chips */}
-            <View style={styles.chipsWrap}>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsRow}>
-                    {chips.map((chip) => {
-                        const isActive = activeFilter === chip.id;
-                        return (
+                <View style={styles.chipsWrap}>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsRow}>
+                        {chips.map((chip) => (
                             <TouchableOpacity
                                 key={chip.id}
-                                style={isActive ? styles.chipActive : styles.chip}
+                                style={[styles.chip, activeFilter === chip.id && styles.chipActive]}
                                 onPress={() => setActiveFilter(chip.id)}
                             >
-                                <Text style={isActive ? styles.chipTextActive : styles.chipText}>{chip.label}</Text>
+                                <Text style={[styles.chipText, activeFilter === chip.id && styles.chipTextActive]}>
+                                    {chip.label}
+                                </Text>
                             </TouchableOpacity>
+                        ))}
+                    </ScrollView>
+                </View>
+
+                <SectionHeader title="Featured clubs" subtitle="Stay connected with your favorites" />
+                <View style={styles.clubRow}>
+                    {featuredClubs.map((club, idx) => (
+                        <SpringCard
+                            key={club.id}
+                            delay={idx * 40}
+                            style={styles.clubCard}
+                            onPress={() => router.push(`/club/${club.id}` as any)}
+                        >
+                            <Image source={{ uri: club.banner }} style={styles.clubImage} />
+                            <LinearGradient colors={['rgba(0,0,0,0.55)', 'transparent']} style={styles.clubGradient} />
+                            <View style={styles.clubInfo}>
+                                <Text style={styles.clubName}>{club.name}</Text>
+                                <Text style={styles.clubTag}>{getClubLabel(club.vibeTag)}</Text>
+                                <Text style={styles.clubFollowers}>{club.followersCount} followers</Text>
+                            </View>
+                        </SpringCard>
+                    ))}
+                </View>
+
+                <SectionHeader title="Spotlight event" subtitle="Trending right now" />
+                <SpringCard
+                    style={styles.spotlightCard}
+                    onPress={() => router.push(`/event/${spotlightEvent.id}` as any)}
+                >
+                    <LinearGradient colors={['#4C46D6', '#6C63FF']} style={styles.spotlightGradient}>
+                        <Text style={styles.spotlightLabel}>Today</Text>
+                        <Text style={styles.spotlightTitle}>{spotlightEvent.title}</Text>
+                        <View style={styles.spotlightMetaRow}>
+                            <Text style={styles.spotlightMetaText}>
+                                {spotlightEvent.date} · {spotlightEvent.time}
+                            </Text>
+                            <TagPill label={spotlightEvent.category} variant="blue" size="sm" />
+                        </View>
+                    </LinearGradient>
+                </SpringCard>
+
+                <SectionHeader title="Popular events" subtitle="Curated with community energy" />
+                <View style={styles.eventList}>
+                    {filteredEvents.slice(0, 5).map((item, index) => {
+                        const seatsLeft = item.totalSeats - item.registeredCount;
+                        return (
+                            <SpringCard
+                                key={item.id}
+                                delay={index * 40}
+                                style={styles.eventListCard}
+                                onPress={() => router.push(`/event/${item.id}` as any)}
+                            >
+                                <Image source={{ uri: item.image }} style={styles.eventImage} />
+                                <LinearGradient colors={['rgba(0,0,0,0.45)', 'transparent']} style={styles.eventGradient} />
+                                <View style={styles.eventListContent}>
+                                    <View style={styles.eventTagRow}>
+                                        <TagPill label={item.category} variant="dark" size="sm" />
+                                        <Text style={styles.eventTagText}>{seatsLeft <= 15 ? 'Hot' : 'Open'}</Text>
+                                    </View>
+                                    <Text style={styles.eventName}>{item.title}</Text>
+                                    <Text style={styles.eventDetails}>
+                                        {new Date(item.date).toLocaleString('default', { month: 'short', day: 'numeric' })} · {item.time}
+                                    </Text>
+                                    <View style={styles.eventFooter}>
+                                        <Text style={styles.eventSeats}>{seatsLeft} seats left</Text>
+                                        <Text style={styles.eventVenue}>{item.location}</Text>
+                                    </View>
+                                </View>
+                            </SpringCard>
                         );
                     })}
-                </ScrollView>
-            </View>
-
-            <View style={styles.sortRow}>
-                <View style={styles.sortLeft}>
-                    <Ionicons name="swap-vertical" size={16} color={Colors.textSecondary} />
-                    <Text style={styles.sortText}>Recents</Text>
+                    <View style={{ height: Spacing.xxl }} />
                 </View>
-                <Ionicons name="grid-outline" size={18} color={Colors.textSecondary} />
-            </View>
-
-            {/* List */}
-            <FlatList
-                // Add a unique key that changes when numColumns changes to force a fresh render
-                key={activeFilter === 'clubs' || activeFilter === 'depts' ? 'grid' : 'list'}
-                data={listData}
-                keyExtractor={item => item.id}
-                contentContainerStyle={styles.listContent}
-                showsVerticalScrollIndicator={false}
-                renderItem={renderFunc}
-                numColumns={activeFilter === 'clubs' || activeFilter === 'depts' ? 2 : 1}
-                columnWrapperStyle={(activeFilter === 'clubs' || activeFilter === 'depts') ? styles.gridRow : undefined}
-            />
+            </ScrollView>
         </SafeAreaView>
     );
 }
 
 const styles = StyleSheet.create({
     safe: { flex: 1, backgroundColor: Colors.background },
-
-    // Header
-    header: {
+    heroWrapper: {
         paddingHorizontal: Spacing.section,
-        paddingTop: Spacing.md,
-        paddingBottom: Spacing.md,
+        paddingTop: Spacing.sm,
     },
-    headerTitle: { ...Typography.h1, color: Colors.text },
-
-    // Chips
-    chipsWrap: {
+    heroBackground: {
+        borderRadius: Radius.xxl,
+        padding: Spacing.lg,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.12)',
+        minHeight: 200,
+        justifyContent: 'space-between',
+    },
+    heroTitle: {
+        ...Typography.h1,
+        color: '#FFF',
+        marginBottom: Spacing.sm,
+    },
+    heroSubtitle: {
+        ...Typography.body2,
+        color: 'rgba(255,255,255,0.75)',
         marginBottom: Spacing.md,
     },
-    chipsRow: {
+    heroStats: {
         flexDirection: 'row',
+        justifyContent: 'space-between',
+        gap: Spacing.md,
+    },
+    heroStat: {
+        flex: 1,
+    },
+    heroStatValue: {
+        ...Typography.h4,
+        color: '#FFF',
+    },
+    heroStatLabel: {
+        ...Typography.caption,
+        color: 'rgba(255,255,255,0.7)',
+    },
+    chipsWrap: {
+        paddingVertical: Spacing.sm,
+        paddingLeft: 0,
+    },
+    chipsRow: {
         paddingHorizontal: Spacing.section,
         gap: Spacing.sm,
     },
     chip: {
-        paddingHorizontal: 16,
+        backgroundColor: Colors.surface,
+        borderRadius: Radius.xxl,
         paddingVertical: 8,
-        borderRadius: Radius.pill,
-        backgroundColor: 'transparent',
+        paddingHorizontal: 18,
         borderWidth: 1,
-        borderColor: Colors.border,
+        borderColor: 'transparent',
     },
-    chipText: { ...Typography.label, color: Colors.textSecondary },
     chipActive: {
-        paddingHorizontal: 16,
-        paddingVertical: 8,
-        borderRadius: Radius.pill,
         backgroundColor: Colors.primary,
-        borderWidth: 1,
         borderColor: Colors.primary,
     },
-    chipTextActive: { ...Typography.label, color: '#FFF', fontWeight: '700' },
-
-    // Sort Row
-    sortRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingHorizontal: Spacing.section,
-        paddingVertical: Spacing.sm,
-        marginBottom: Spacing.xs,
+    chipText: {
+        ...Typography.body2,
+        color: Colors.text,
     },
-    sortLeft: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
-    sortText: { ...Typography.label, color: Colors.textSecondary, fontWeight: '600' },
-
-    // List / Grid
-    listContent: { paddingHorizontal: Spacing.section, paddingBottom: 100 },
-    gridRow: { gap: Spacing.md, marginBottom: Spacing.md },
-    clubCardContainer: {
+    chipTextActive: {
+        color: '#FFF',
+        fontWeight: '700' as const,
+    },
+    scrollContentEnhanced: {
+        paddingHorizontal: Spacing.section,
+        paddingBottom: Spacing.xl,
+    },
+    clubRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        gap: Spacing.sm,
+        marginBottom: Spacing.lg,
+    },
+    clubCard: {
         flex: 1,
-        borderRadius: Radius.lg,
-        ...Shadows.md,
+        minHeight: 160,
+        borderRadius: Radius.xl,
         overflow: 'hidden',
     },
-    clubCardBanner: {
-        width: '100%',
-        height: 160,
-        backgroundColor: Colors.surface,
+    clubImage: {
+        ...StyleSheet.absoluteFillObject,
     },
-    clubCardGradient: {
-        flex: 1,
+    clubGradient: {
+        ...StyleSheet.absoluteFillObject,
+    },
+    clubInfo: {
+        position: 'absolute',
+        bottom: Spacing.md,
+        left: Spacing.md,
+        right: Spacing.md,
+    },
+    clubName: {
+        ...Typography.h4,
+        color: '#FFF',
+    },
+    clubTag: {
+        ...Typography.caption,
+        color: 'rgba(255,255,255,0.8)',
+    },
+    clubFollowers: {
+        ...Typography.caption,
+        color: '#FFF',
+        marginTop: Spacing.xs,
+    },
+    spotlightCard: {
+        borderRadius: Radius.xxl,
+        overflow: 'hidden',
+        marginBottom: Spacing.lg,
+    },
+    spotlightGradient: {
+        padding: Spacing.lg,
+        minHeight: 150,
+        justifyContent: 'space-between',
+    },
+    spotlightLabel: {
+        ...Typography.micro,
+        color: 'rgba(255,255,255,0.8)',
+        letterSpacing: 1.1,
+    },
+    spotlightTitle: {
+        ...Typography.h3,
+        color: '#FFF',
+        marginTop: Spacing.xs,
+    },
+    spotlightMetaRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginTop: Spacing.sm,
+    },
+    spotlightMetaText: {
+        ...Typography.body2,
+        color: 'rgba(255,255,255,0.8)',
+    },
+    eventList: {
+        flexDirection: 'column',
+        gap: Spacing.md,
+    },
+    eventListCard: {
+        borderRadius: Radius.xl,
+        overflow: 'hidden',
+        minHeight: 190,
+    },
+    eventImage: {
+        width: '100%',
+        height: 140,
+    },
+    eventGradient: {
+        ...StyleSheet.absoluteFillObject,
+    },
+    eventListContent: {
         padding: Spacing.md,
-        justifyContent: 'flex-end',
+        gap: Spacing.xs,
+        minHeight: 120,
+        justifyContent: 'space-between',
+        backgroundColor: Colors.cardBg,
+    },
+    eventTagRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
         alignItems: 'center',
     },
-    clubCardLogo: {
-        width: 56,
-        height: 56,
-        borderRadius: 28, // Circular logo for visual flair
-        backgroundColor: Colors.surface,
-        marginBottom: Spacing.sm,
-        borderWidth: 2,
-        borderColor: '#FFF',
+    eventTagText: {
+        ...Typography.caption,
+        color: Colors.primary,
+        fontWeight: '700' as const,
     },
-    clubCardContent: {
-        width: '100%',
+    eventName: {
+        ...Typography.h4,
+        color: Colors.text,
+        marginTop: Spacing.sm,
+        lineHeight: 20,
+    },
+    eventDetails: {
+        ...Typography.caption,
+        color: Colors.textSecondary,
+        marginTop: Spacing.xs,
+    },
+    eventFooter: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
         alignItems: 'center',
+        marginTop: Spacing.sm,
     },
-    clubCardTitle: {
+    eventSeats: {
         ...Typography.h5,
-        color: '#FFF',
-        marginBottom: 2,
-        textAlign: 'center',
+        color: Colors.primary,
     },
-    clubCardSubtitle: {
-        ...Typography.micro,
-        color: 'rgba(255,255,255,0.7)',
-        textAlign: 'center',
-        marginBottom: 2,
-    },
-    clubCardFollowers: {
-        ...Typography.micro,
-        color: 'rgba(255,255,255,0.9)',
-        fontWeight: 'bold',
-        textAlign: 'center',
-    },
-
-    // Event Row Styles (Matching Events Tab)
-    eventRow: { flexDirection: 'row', overflow: 'hidden' },
-    eventRowImage: {
-        width: 110,
-        height: 120,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    eventRowContent: { flex: 1, padding: Spacing.md, gap: 5, justifyContent: 'center' },
-    eventRowTop: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-    seatsLeft: { ...Typography.micro, color: Colors.error, fontWeight: '700' as const },
-    eventRowTitle: { ...Typography.h5, color: Colors.text },
-    eventRowMeta: { ...Typography.caption, color: Colors.textSecondary },
-    eventRowBottom: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 2 },
-    eventRowPrice: { ...Typography.label, color: Colors.primary, fontSize: 13, fontWeight: '700' as const },
-    explicitBadge: {
-        backgroundColor: Colors.primary,
-        paddingHorizontal: 6,
-        paddingVertical: 2,
-        borderRadius: 4,
-    },
-    explicitText: {
-        fontSize: 9,
-        color: '#FFF',
-        fontWeight: 'bold',
+    eventVenue: {
+        ...Typography.caption,
+        color: Colors.textSecondary,
     },
 });

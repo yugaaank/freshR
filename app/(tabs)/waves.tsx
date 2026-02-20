@@ -2,18 +2,21 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React, { useCallback, useRef } from 'react';
 import {
+    Alert,
     Dimensions,
     FlatList,
     Image,
     Platform,
+    Share,
     StyleSheet,
     Text,
     TouchableOpacity,
     View
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHybridStore } from '../../src/store/hybridStore';
-import { Radius, Spacing, Typography } from '../../src/theme';
+import { Colors, Radius, Shadows, Spacing, Typography } from '../../src/theme';
 
 const { width: SW, height: SH } = Dimensions.get('window');
 
@@ -23,12 +26,10 @@ const BOTTOM_TAB_HEIGHT = Platform.OS === 'ios' ? 88 : 68;
 const SNAP_HEIGHT = SH - BOTTOM_TAB_HEIGHT;
 
 export default function WavesScreen() {
-    const { getRankedFeed, registerEvent, user } = useHybridStore();
+    const { getRankedFeed, registerEvent, updatePostEngagement, user } = useHybridStore();
     const insets = useSafeAreaInsets();
-
     // Get dynamically ranked feed
     const feed = getRankedFeed();
-
     // Viewability config for triggering "Going?" CTAs on Reels
     const viewabilityConfig = useRef({
         itemVisiblePercentThreshold: 80,
@@ -38,6 +39,22 @@ export default function WavesScreen() {
     const onViewableItemsChanged = useRef((_info: any) => {
         // Reserved for future viewability triggering
     }).current;
+
+    const handleLike = useCallback((itemId: string) => {
+        updatePostEngagement(itemId, 1);
+    }, [updatePostEngagement]);
+
+    const handleComment = useCallback(() => {
+        Alert.alert('Feature coming soon', 'Comment threads will arrive in waves.');
+    }, []);
+
+    const handleShare = useCallback(async (caption: string) => {
+        try {
+            await Share.share({ message: `Check out this club update: ${caption}` });
+        } catch (error) {
+            Alert.alert('Share failed', 'Unable to share right now.');
+        }
+    }, []);
 
     const renderPost = useCallback(({ item, index }: { item: ReturnType<typeof getRankedFeed>[0], index: number }) => {
         const isRegistered = item.event ? user.registeredEvents.includes(item.event.id) : false;
@@ -52,26 +69,26 @@ export default function WavesScreen() {
                 <View style={styles.mediaGradient} />
 
                 {/* Right Side Action Column */}
-                <View style={[styles.actionColumn, { paddingBottom: insets.bottom + 80 }]}>
-                    <TouchableOpacity style={styles.actionBtn}>
+                <View style={[styles.actionColumn, { paddingBottom: insets.bottom + 12 }]}>
+                    <TouchableOpacity style={styles.actionBtn} onPress={() => handleLike(item.id)}>
                         <Ionicons name="heart" size={32} color="#FFF" />
                         <Text style={styles.actionCount}>{item.engagementScore}</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity style={styles.actionBtn}>
+                    <TouchableOpacity style={styles.actionBtn} onPress={handleComment}>
                         <Ionicons name="chatbubble" size={30} color="#FFF" />
                         <Text style={styles.actionCount}>{Math.floor(item.engagementScore / 10)}</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity style={styles.actionBtn}>
+                    <TouchableOpacity style={styles.actionBtn} onPress={() => handleShare(item.caption)}>
                         <Ionicons name="paper-plane" size={30} color="#FFF" />
                         <Text style={styles.actionCount}>Share</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity style={styles.actionBtn}>
+                    <TouchableOpacity style={styles.actionBtn} onPress={() => Alert.alert('More options', 'Coming soon')}>
                         <Ionicons name="ellipsis-horizontal" size={30} color="#FFF" />
                     </TouchableOpacity>
                 </View>
 
                 {/* Bottom Left Info Wrapper */}
-                <View style={[styles.infoColumn, { paddingBottom: insets.bottom + 20 }]}>
+                <View style={[styles.infoColumn, { paddingBottom: insets.bottom + 8 }]}>
                     {/* Club Info */}
                     <TouchableOpacity
                         style={styles.clubRow}
@@ -144,6 +161,8 @@ export default function WavesScreen() {
                 decelerationRate="fast"
                 onViewableItemsChanged={onViewableItemsChanged}
                 viewabilityConfig={viewabilityConfig}
+                ListFooterComponent={<View style={{ height: insets.bottom + BOTTOM_TAB_HEIGHT + 48 }} />}
+                contentContainerStyle={{ paddingBottom: insets.bottom + BOTTOM_TAB_HEIGHT + 48 }}
             />
         </View>
     );
