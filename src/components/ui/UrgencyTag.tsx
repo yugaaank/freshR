@@ -31,7 +31,7 @@ const styles = StyleSheet.create({
         alignSelf: 'flex-start',
         paddingHorizontal: Spacing.sm,
         paddingVertical: 3,
-        borderRadius: Radius.full,
+        borderRadius: Radius.pill,
         gap: 4,
     },
     dot: {

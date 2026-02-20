@@ -25,6 +25,8 @@ export interface Event {
     tickets: EventTicket[];
     tags: string[];
     attendees: number;
+    colorBg?: string;   // hero card gradient base color
+    emoji?: string;     // event thumbnail emoji
 }
 
 export const events: Event[] = [
@@ -51,6 +53,8 @@ export const events: Event[] = [
         ],
         tags: ['Hackathon', 'AI', 'Prizes', 'Free'],
         attendees: 188,
+        colorBg: '#1A1A2E',
+        emoji: '💻',
     },
     {
         id: 'e2',
@@ -75,6 +79,8 @@ export const events: Event[] = [
         ],
         tags: ['Music', 'Live', 'DJ Night'],
         attendees: 482,
+        colorBg: '#2D1B4E',
+        emoji: '🎸',
     },
     {
         id: 'e3',
@@ -96,6 +102,8 @@ export const events: Event[] = [
         tickets: [{ type: 'Participant', price: 0, available: 24 }],
         tags: ['Mobile', 'Free', 'Laptop Required'],
         attendees: 36,
+        colorBg: '#0D2137',
+        emoji: '📱',
     },
     {
         id: 'e4',
@@ -116,6 +124,8 @@ export const events: Event[] = [
         tickets: [{ type: 'General', price: 0, available: 150 }],
         tags: ['Cricket', 'IPL', 'Free'],
         attendees: 150,
+        colorBg: '#1B3A1B',
+        emoji: '🏏',
     },
     {
         id: 'e5',
@@ -137,6 +147,8 @@ export const events: Event[] = [
         tickets: [{ type: 'Audience', price: 0, available: 8 }],
         tags: ['Startup', 'VC', 'Funding'],
         attendees: 92,
+        colorBg: '#1A0A2E',
+        emoji: '🚀',
     },
     {
         id: 'e6',
@@ -161,6 +173,8 @@ export const events: Event[] = [
         ],
         tags: ['Design', 'UX', 'Portfolio Review'],
         attendees: 600,
+        colorBg: '#1E1E1E',
+        emoji: '🎨',
     },
     {
         id: 'e7',
@@ -181,5 +195,7 @@ export const events: Event[] = [
         tickets: [{ type: 'General', price: 499, available: 47 }],
         tags: ['TED', 'Talks', 'Inspiration'],
         attendees: 553,
+        colorBg: '#1A0000',
+        emoji: '🎤',
     },
 ];

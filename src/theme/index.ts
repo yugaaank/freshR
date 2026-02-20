@@ -1,61 +1,124 @@
+// =============================================================
+// CampusOS Design System — World-Class Premium Theme
+// Inspired by: Blinkit (bold/warm), Spotify (gradients/depth), Apple (spacing/glass)
+// =============================================================
+
+import { Platform } from 'react-native';
+
 export const Colors = {
-    // Brand
+    // ── Brand Primaries
     primary: '#FC8019',
+    primaryGradientStart: '#FF6B35',
+    primaryGradientEnd: '#FC8019',
     primaryLight: '#FFF3E8',
     primaryDark: '#E56F0D',
 
-    // Background
-    background: '#FFFFFF',
-    surface: '#F5F5F7',
-    sectionBg: '#F0F0F5',
-    cardBg: '#FFFFFF',
+    // ── Secondary Accent — Electric Indigo (coding/academics)
+    accent: '#6C63FF',
+    accentLight: '#F0EFFF',
+    accentDark: '#5549E8',
+    accentGradientStart: '#8B7FFF',
+    accentGradientEnd: '#6C63FF',
 
-    // Text
+    // ── Teal (Map/Location)
+    teal: '#00C9B1',
+    tealLight: '#E0FAF7',
+
+    // ── Backgrounds (Apple iOS System Grays)
+    background: '#FAFAFA',
+    surface: '#F2F2F7',
+    sectionBg: '#F2F2F7',
+    cardBg: '#FFFFFF',
+    darkBg: '#1C1C1E',
+    darkBgSecondary: '#2C2C2E',
+    heroBg: '#1A1A2E',
+    heroBgEnd: '#16213E',
+
+    // ── Text
     text: '#1C1C1E',
     textSecondary: '#6B6B6B',
-    textTertiary: '#9E9E9E',
+    textTertiary: '#AEAEB2',
     textLight: '#FFFFFF',
+    textDimmed: 'rgba(255,255,255,0.70)',
 
-    // Semantic
-    success: '#0C9B52',
-    successLight: '#E8F7EF',
-    error: '#D93025',
-    errorLight: '#FDECEA',
-    warning: '#FC8019',
-    warningLight: '#FFF3E8',
-    info: '#1A73E8',
-    infoLight: '#E8F0FE',
+    // ── Semantic
+    success: '#34C759',          // Apple green
+    successLight: '#E8FAF0',
+    error: '#FF3B30',            // Apple red
+    errorLight: '#FFF0EF',
+    warning: '#FF9500',          // Apple orange
+    warningLight: '#FFF3E0',
+    info: '#007AFF',             // Apple blue
+    infoLight: '#E5F1FF',
 
-    // UI
+    // ── UI Chrome
     border: '#E8E8E8',
-    divider: '#F0F0F0',
-    skeleton: '#F0F0F5',
-    overlay: 'rgba(0, 0, 0, 0.5)',
+    borderStrong: '#D1D1D6',
+    divider: '#F2F2F7',
+    overlay: 'rgba(0,0,0,0.50)',
+    overlayLight: 'rgba(0,0,0,0.30)',
+    overlayDark: 'rgba(0,0,0,0.75)',
 
-    // Tags/Categories
-    tagBlue: '#E8F0FE',
-    tagBlueTxt: '#1A73E8',
-    tagGreen: '#E8F7EF',
-    tagGreenTxt: '#0C9B52',
+    // ── Glass
+    glassBg: 'rgba(255,255,255,0.12)',
+    glassWhite: 'rgba(255,255,255,0.90)',
+    glassDark: 'rgba(28,28,30,0.75)',
+    highlight: 'rgba(255,255,255,0.15)',   // top-border highlight on dark cards
+
+    // ── Tag variants
+    tagBlue: '#E5F1FF',
+    tagBlueTxt: '#007AFF',
+    tagGreen: '#E8FAF0',
+    tagGreenTxt: '#34C759',
     tagOrange: '#FFF3E8',
     tagOrangeTxt: '#FC8019',
-    tagPurple: '#F3E8FF',
-    tagPurpleTxt: '#7B1FA2',
-    tagRed: '#FDECEA',
-    tagRedTxt: '#D93025',
+    tagPurple: '#F0EFFF',
+    tagPurpleTxt: '#6C63FF',
+    tagRed: '#FFF0EF',
+    tagRedTxt: '#FF3B30',
+    tagTeal: '#E0FAF7',
+    tagTealTxt: '#00C9B1',
+    tagGrey: '#F2F2F7',
+    tagGreyTxt: '#6B6B6B',
+};
+
+// ── Gradient Presets (pass to LinearGradient colors prop)
+export const Gradients = {
+    primary: [Colors.primaryGradientStart, Colors.primaryGradientEnd],
+    accent: [Colors.accentGradientStart, Colors.accentGradientEnd],
+    dark: [Colors.heroBg, Colors.heroBgEnd],
+    heroOverlay: ['transparent', 'rgba(0,0,0,0.85)'],
+    cardOverlay: ['transparent', 'rgba(0,0,0,0.70)'],
+    headerStrip: ['#FFF8F3', '#FAFAFA'],
+    food: ['#FF6B35', '#FC8019'],
+    events: ['#7B6FF0', '#6C63FF'],
+    map: ['#00D4BC', '#00C9B1'],
+    academics: ['#007AFF', '#5856D6'],
+    white: ['rgba(255,255,255,0)', 'rgba(255,255,255,1)'],  // bottom fade
 };
 
 export const Typography = {
-    h1: { fontSize: 28, fontWeight: '800' as const, letterSpacing: -0.5 },
-    h2: { fontSize: 22, fontWeight: '700' as const, letterSpacing: -0.3 },
-    h3: { fontSize: 18, fontWeight: '700' as const, letterSpacing: -0.2 },
-    h4: { fontSize: 16, fontWeight: '600' as const },
-    h5: { fontSize: 14, fontWeight: '600' as const },
-    body1: { fontSize: 15, fontWeight: '400' as const },
-    body2: { fontSize: 13, fontWeight: '400' as const },
+    // Display
+    display: { fontSize: 40, fontWeight: '800' as const, letterSpacing: -1.5 },
+    hero: { fontSize: 32, fontWeight: '800' as const, letterSpacing: -1.0 },
+    // Headings
+    h1: { fontSize: 28, fontWeight: '800' as const, letterSpacing: -0.8 },
+    h2: { fontSize: 22, fontWeight: '700' as const, letterSpacing: -0.5 },
+    h3: { fontSize: 18, fontWeight: '700' as const, letterSpacing: -0.3 },
+    h4: { fontSize: 16, fontWeight: '600' as const, letterSpacing: -0.2 },
+    h5: { fontSize: 14, fontWeight: '600' as const, letterSpacing: 0 },
+    // Body
+    body1: { fontSize: 15, fontWeight: '400' as const, lineHeight: 22 },
+    body2: { fontSize: 13, fontWeight: '400' as const, lineHeight: 18 },
+    // UI
     caption: { fontSize: 12, fontWeight: '400' as const },
     label: { fontSize: 11, fontWeight: '600' as const, letterSpacing: 0.3 },
+    micro: { fontSize: 10, fontWeight: '600' as const, letterSpacing: 0.4 },
+    // Mono (code blocks)
+    mono: { fontSize: 13, fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace' },
+    // Price
     price: { fontSize: 17, fontWeight: '700' as const },
+    priceLg: { fontSize: 22, fontWeight: '800' as const },
 };
 
 export const Spacing = {
@@ -66,7 +129,7 @@ export const Spacing = {
     xl: 20,
     xxl: 24,
     xxxl: 32,
-    section: 40,
+    section: 20,   // upgraded from 16
 };
 
 export const Radius = {
@@ -75,46 +138,55 @@ export const Radius = {
     lg: 16,
     xl: 20,
     xxl: 24,
-    full: 9999,
+    pill: 9999,
 };
 
+// ── Shadow system — ultra-subtle (opacity ≤ 0.08)
 export const Shadows = {
-    sm: {
+    none: {},
+    xs: {
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.04,
+        shadowRadius: 3,
+        elevation: 1,
+    },
+    sm: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.06,
-        shadowRadius: 4,
+        shadowRadius: 6,
         elevation: 2,
     },
     md: {
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.08,
-        shadowRadius: 8,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.07,
+        shadowRadius: 10,
         elevation: 4,
     },
     lg: {
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.12,
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.08,
         shadowRadius: 16,
-        elevation: 8,
+        elevation: 6,
     },
     floating: {
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: -4 },
-        shadowOpacity: 0.1,
+        shadowOffset: { width: 0, height: -3 },
+        shadowOpacity: 0.07,
         shadowRadius: 12,
         elevation: 12,
     },
+    colored: (hex: string) => ({
+        shadowColor: hex,
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.30,
+        shadowRadius: 12,
+        elevation: 6,
+    }),
 };
 
-export const Theme = {
-    colors: Colors,
-    typography: Typography,
-    spacing: Spacing,
-    radius: Radius,
-    shadows: Shadows,
-};
-
+const Theme = { Colors, Gradients, Typography, Spacing, Radius, Shadows };
 export default Theme;

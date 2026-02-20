@@ -2,147 +2,161 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React, { useState } from 'react';
 import {
+    Dimensions,
     FlatList,
-    Image,
+    ScrollView,
     StyleSheet,
     Text,
     TouchableOpacity,
-    View
+    View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import Card from '../../src/components/ui/Card';
 import TagPill from '../../src/components/ui/TagPill';
-import UrgencyTag from '../../src/components/ui/UrgencyTag';
-import { Event, EventCategory, events } from '../../src/data/events';
+import { events } from '../../src/data/events';
 import { Colors, Radius, Shadows, Spacing, Typography } from '../../src/theme';
 
-type Tab = 'college' | 'city';
+const { width: SW } = Dimensions.get('window');
 
-const CATEGORY_FILTERS: Array<{ id: string; label: string }> = [
-    { id: 'all', label: 'All' },
-    { id: 'Tech', label: '💻 Tech' },
-    { id: 'Music', label: '🎵 Music' },
-    { id: 'Sports', label: '⚽ Sports' },
-    { id: 'Cultural', label: '🎭 Cultural' },
-    { id: 'Workshop', label: '🔧 Workshop' },
-    { id: 'Academic', label: '📚 Academic' },
-];
+const TABS = ['My College', 'City Events'];
+const CATEGORIES = ['All', 'Tech', 'Music', 'Sports', 'Cultural', 'Workshop', 'Academic'];
 
-const variantMap: Record<EventCategory, 'blue' | 'orange' | 'green' | 'purple' | 'red' | 'grey'> = {
-    Tech: 'blue',
-    Cultural: 'purple',
-    Sports: 'green',
-    Academic: 'blue',
-    Music: 'orange',
-    Drama: 'purple',
-    Workshop: 'orange',
+const CATEGORY_COLORS: Record<string, string> = {
+    Tech: '#007AFF', Music: '#FF2D55', Sports: '#34C759',
+    Cultural: '#AF52DE', Workshop: '#FF9500', Academic: '#5856D6', All: '#6B6B6B',
 };
 
 export default function EventsScreen() {
-    const [tab, setTab] = useState<Tab>('college');
-    const [activeFilter, setActiveFilter] = useState('all');
+    const [activeTab, setActiveTab] = useState(0);
+    const [activeCat, setActiveCat] = useState('All');
 
-    const filtered = events
-        .filter((e) =>
-            tab === 'college' ? e.college !== 'City Event' : e.college === 'City Event'
-        )
-        .filter((e) => activeFilter === 'all' || e.category === activeFilter);
+    const filtered = events.filter(
+        (e) => activeCat === 'All' || e.category === activeCat
+    );
+    const featured = filtered[0];
+    const rest = filtered.slice(1);
 
     return (
         <SafeAreaView style={styles.safe} edges={['top']}>
             {/* Header */}
             <View style={styles.header}>
                 <Text style={styles.headerTitle}>Events</Text>
-                <TouchableOpacity style={styles.filterBtn}>
-                    <Ionicons name="options-outline" size={20} color={Colors.text} />
+                <TouchableOpacity style={styles.searchIconBtn} activeOpacity={0.88}>
+                    <Ionicons name="search-outline" size={22} color={Colors.text} />
                 </TouchableOpacity>
             </View>
 
             {/* Tabs */}
             <View style={styles.tabRow}>
-                {(['college', 'city'] as Tab[]).map((t) => (
+                {TABS.map((tab, idx) => (
                     <TouchableOpacity
-                        key={t}
-                        style={[styles.tab, tab === t && styles.tabActive]}
-                        onPress={() => setTab(t)}
+                        key={tab}
+                        style={[styles.tab, activeTab === idx && styles.tabActive]}
+                        onPress={() => setActiveTab(idx)}
+                        activeOpacity={0.88}
                     >
-                        <Text style={[styles.tabText, tab === t && styles.tabTextActive]}>
-                            {t === 'college' ? 'My College' : 'City Events'}
+                        <Text style={[styles.tabText, activeTab === idx && styles.tabTextActive]}>
+                            {tab}
                         </Text>
                     </TouchableOpacity>
                 ))}
             </View>
 
-            {/* Category Filter Chips */}
-            <FlatList
+            {/* Category Pills */}
+            <ScrollView
                 horizontal
-                data={CATEGORY_FILTERS}
-                keyExtractor={(item) => item.id}
                 showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.filterRow}
-                renderItem={({ item }) => (
+                contentContainerStyle={styles.catRow}
+            >
+                {CATEGORIES.map((cat) => (
                     <TouchableOpacity
-                        style={[styles.filterChip, activeFilter === item.id && styles.filterChipActive]}
-                        onPress={() => setActiveFilter(item.id)}
+                        key={cat}
+                        style={[
+                            styles.catChip,
+                            activeCat === cat && { backgroundColor: CATEGORY_COLORS[cat] ?? Colors.primary },
+                        ]}
+                        onPress={() => setActiveCat(cat)}
+                        activeOpacity={0.88}
                     >
-                        <Text style={[styles.filterChipText, activeFilter === item.id && styles.filterChipTextActive]}>
-                            {item.label}
+                        <Text style={[styles.catText, activeCat === cat && styles.catTextActive]}>
+                            {cat}
                         </Text>
                     </TouchableOpacity>
-                )}
-            />
+                ))}
+            </ScrollView>
 
-            {/* Events List */}
             <FlatList
-                data={filtered}
-                keyExtractor={(item) => item.id}
-                contentContainerStyle={styles.list}
+                data={rest}
+                keyExtractor={(e) => e.id}
                 showsVerticalScrollIndicator={false}
-                renderItem={({ item }) => <EventCard event={item} />}
-                ListEmptyComponent={
-                    <View style={styles.empty}>
-                        <Text style={styles.emptyText}>No events found 🙁</Text>
-                    </View>
+                contentContainerStyle={styles.list}
+                ListHeaderComponent={
+                    featured ? (
+                        <TouchableOpacity
+                            activeOpacity={0.92}
+                            onPress={() => router.push(`/event/${featured.id}` as any)}
+                            style={styles.featuredCard}
+                        >
+                            <View style={[styles.featuredHero, { backgroundColor: featured.colorBg ?? '#1A1A2E' }]}>
+                                {/* Gradient overlay via dark-to-transparent via absolute view */}
+                                <View style={styles.featuredOverlay} />
+                                <View style={styles.featuredContent}>
+                                    <TagPill label={featured.category} variant="dark" size="sm" />
+                                    <View style={styles.featuredBottom}>
+                                        <Text style={styles.featuredTitle} numberOfLines={2}>{featured.title}</Text>
+                                        <View style={styles.featuredMeta}>
+                                            <Ionicons name="location-outline" size={13} color="rgba(255,255,255,0.7)" />
+                                            <Text style={styles.featuredMetaText}>{featured.venue}</Text>
+                                            <View style={styles.dot} />
+                                            <Text style={styles.featuredMetaText}>{featured.date}</Text>
+                                        </View>
+                                        <View style={styles.featuredFooter}>
+                                            <Text style={styles.featuredPrice}>
+                                                {featured.tickets[0].price === 0 ? 'Free' : `₹${featured.tickets[0].price}`}
+                                            </Text>
+                                            {featured.seatsLeft < 30 && (
+                                                <View style={styles.urgencyPill}>
+                                                    <Ionicons name="flash" size={11} color="#FFD60A" />
+                                                    <Text style={styles.urgencyText}>{featured.seatsLeft} seats left</Text>
+                                                </View>
+                                            )}
+                                        </View>
+                                    </View>
+                                </View>
+                            </View>
+                        </TouchableOpacity>
+                    ) : null
                 }
+                renderItem={({ item }) => (
+                    <TouchableOpacity
+                        activeOpacity={0.88}
+                        onPress={() => router.push(`/event/${item.id}` as any)}
+                    >
+                        <Card style={styles.eventRow} padding={0} shadow="sm">
+                            {/* Left image block */}
+                            <View style={[styles.eventRowImage, { backgroundColor: item.colorBg ?? '#1A1A2E' }]}>
+                                <Text style={styles.eventRowEmoji}>{item.emoji ?? '🎉'}</Text>
+                            </View>
+                            {/* Content */}
+                            <View style={styles.eventRowContent}>
+                                <View style={styles.eventRowTop}>
+                                    <TagPill label={item.category} variant="blue" size="sm" />
+                                    {item.seatsLeft < 30 && (
+                                        <Text style={styles.seatsLeft}>⚡ {item.seatsLeft} left</Text>
+                                    )}
+                                </View>
+                                <Text style={styles.eventRowTitle} numberOfLines={2}>{item.title}</Text>
+                                <Text style={styles.eventRowMeta}>{item.date} · {item.venue}</Text>
+                                <Text style={styles.eventRowPrice}>
+                                    {item.tickets[0].price === 0 ? 'Free' : `₹${item.tickets[0].price}`}
+                                </Text>
+                            </View>
+                        </Card>
+                    </TouchableOpacity>
+                )}
+                ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
             />
         </SafeAreaView>
-    );
-}
-
-function EventCard({ event }: { event: Event }) {
-    return (
-        <TouchableOpacity
-            style={[styles.card, Shadows.sm]}
-            onPress={() => router.push(`/event/${event.id}` as any)}
-            activeOpacity={0.92}
-        >
-            <Image source={{ uri: event.image }} style={styles.cardImage} />
-            <View style={styles.cardContent}>
-                <View style={styles.cardTop}>
-                    <TagPill label={event.category} variant={variantMap[event.category] || 'blue'} size="sm" />
-                    {event.seatsLeft < 20 && (
-                        <UrgencyTag label={`${event.seatsLeft} left`} variant="danger" />
-                    )}
-                </View>
-                <Text style={styles.cardTitle} numberOfLines={2}>{event.title}</Text>
-                <View style={styles.cardMeta}>
-                    <Ionicons name="calendar-outline" size={12} color={Colors.textSecondary} />
-                    <Text style={styles.cardMetaText}>{event.date} · {event.time}</Text>
-                </View>
-                <View style={styles.cardMeta}>
-                    <Ionicons name="location-outline" size={12} color={Colors.textSecondary} />
-                    <Text style={styles.cardMetaText} numberOfLines={1}>{event.venue}</Text>
-                </View>
-                <View style={styles.cardFooter}>
-                    <Text style={styles.cardPrice}>
-                        {event.tickets[0].price === 0 ? 'Free' : `₹${event.tickets[0].price}`}
-                    </Text>
-                    <View style={styles.attendeesRow}>
-                        <Ionicons name="people-outline" size={12} color={Colors.textSecondary} />
-                        <Text style={styles.attendeesText}>{event.attendees} attending</Text>
-                    </View>
-                </View>
-            </View>
-        </TouchableOpacity>
     );
 }
 
@@ -152,64 +166,92 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        paddingHorizontal: Spacing.lg,
-        paddingVertical: Spacing.md,
+        paddingHorizontal: Spacing.section,
+        paddingTop: Spacing.md,
+        paddingBottom: Spacing.sm,
     },
-    headerTitle: { ...Typography.h2, color: Colors.text },
-    filterBtn: {
-        width: 36,
-        height: 36,
-        borderRadius: Radius.sm,
-        backgroundColor: Colors.sectionBg,
+    headerTitle: { ...Typography.h1, color: Colors.text },
+    searchIconBtn: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: Colors.surface,
         alignItems: 'center',
         justifyContent: 'center',
     },
+    // Tab bar
     tabRow: {
         flexDirection: 'row',
-        marginHorizontal: Spacing.lg,
-        backgroundColor: Colors.sectionBg,
-        borderRadius: Radius.md,
-        padding: 3,
-        marginBottom: Spacing.md,
+        paddingHorizontal: Spacing.section,
+        borderBottomWidth: 1,
+        borderBottomColor: Colors.border,
+        marginBottom: Spacing.sm,
     },
     tab: {
-        flex: 1,
         paddingVertical: Spacing.sm,
-        alignItems: 'center',
-        borderRadius: Radius.sm,
+        paddingHorizontal: Spacing.lg,
+        marginRight: Spacing.md,
+        borderBottomWidth: 3,
+        borderBottomColor: 'transparent',
     },
-    tabActive: { backgroundColor: Colors.cardBg, ...Shadows.sm },
-    tabText: { ...Typography.body2, color: Colors.textSecondary, fontWeight: '600' },
-    tabTextActive: { color: Colors.text },
-    filterRow: { paddingHorizontal: Spacing.lg, gap: Spacing.sm, marginBottom: Spacing.md },
-    filterChip: {
-        paddingHorizontal: Spacing.md,
-        paddingVertical: Spacing.xs + 2,
-        borderRadius: Radius.full,
-        backgroundColor: Colors.sectionBg,
-        borderWidth: 1,
-        borderColor: 'transparent',
+    tabActive: { borderBottomColor: Colors.primary },
+    tabText: { ...Typography.h5, color: Colors.textSecondary },
+    tabTextActive: { color: Colors.primary },
+    // Categories
+    catRow: { paddingHorizontal: Spacing.section, gap: 8, paddingBottom: Spacing.md },
+    catChip: {
+        paddingHorizontal: 14,
+        paddingVertical: 6,
+        borderRadius: Radius.pill,
+        backgroundColor: Colors.surface,
     },
-    filterChipActive: { backgroundColor: Colors.primaryLight, borderColor: Colors.primary },
-    filterChipText: { ...Typography.caption, color: Colors.textSecondary, fontWeight: '600' },
-    filterChipTextActive: { color: Colors.primary },
-    list: { paddingHorizontal: Spacing.lg, gap: Spacing.md, paddingBottom: Spacing.xxl },
-    card: {
-        flexDirection: 'row',
-        backgroundColor: Colors.cardBg,
-        borderRadius: Radius.lg,
+    catText: { ...Typography.label, fontSize: 12, color: Colors.textSecondary, fontWeight: '600' as const },
+    catTextActive: { color: '#FFF' },
+    // Featured card
+    featuredCard: {
+        marginHorizontal: Spacing.section,
+        marginBottom: 10,
+        borderRadius: Radius.xl,
         overflow: 'hidden',
+        ...Shadows.md,
     },
-    cardImage: { width: 110, height: 130 },
-    cardContent: { flex: 1, padding: Spacing.md, gap: 5 },
-    cardTop: { flexDirection: 'row', gap: Spacing.xs, flexWrap: 'wrap' },
-    cardTitle: { ...Typography.h5, color: Colors.text },
-    cardMeta: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-    cardMetaText: { ...Typography.caption, color: Colors.textSecondary, flex: 1 },
-    cardFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 },
-    cardPrice: { ...Typography.price, color: Colors.primary, fontSize: 15 },
-    attendeesRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-    attendeesText: { ...Typography.caption, color: Colors.textSecondary },
-    empty: { alignItems: 'center', paddingTop: 60 },
-    emptyText: { ...Typography.body1, color: Colors.textSecondary },
+    featuredHero: { height: 240, justifyContent: 'flex-end' },
+    featuredOverlay: {
+        ...StyleSheet.absoluteFillObject,
+        backgroundColor: 'rgba(0,0,0,0.55)',
+    },
+    featuredContent: { padding: Spacing.lg, gap: Spacing.md },
+    featuredBottom: { gap: 8 },
+    featuredTitle: { ...Typography.hero, color: '#FFF' },
+    featuredMeta: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+    featuredMetaText: { ...Typography.caption, color: 'rgba(255,255,255,0.70)' },
+    dot: { width: 3, height: 3, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.40)' },
+    featuredFooter: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+    featuredPrice: { ...Typography.price, color: '#FFF' },
+    urgencyPill: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        backgroundColor: 'rgba(255,59,48,0.25)',
+        borderRadius: Radius.pill,
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+    },
+    urgencyText: { ...Typography.label, color: '#FFD60A', fontSize: 11 },
+    // Event row card (horizontal)
+    list: { paddingHorizontal: Spacing.section, paddingBottom: 90 },
+    eventRow: { flexDirection: 'row', overflow: 'hidden' },
+    eventRowImage: {
+        width: 110,
+        height: 120,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    eventRowEmoji: { fontSize: 44 },
+    eventRowContent: { flex: 1, padding: Spacing.md, gap: 5, justifyContent: 'center' },
+    eventRowTop: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    seatsLeft: { ...Typography.micro, color: Colors.error, fontWeight: '700' as const },
+    eventRowTitle: { ...Typography.h5, color: Colors.text },
+    eventRowMeta: { ...Typography.caption, color: Colors.textSecondary },
+    eventRowPrice: { ...Typography.label, color: Colors.primary, fontSize: 13, fontWeight: '700' as const },
 });

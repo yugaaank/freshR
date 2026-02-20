@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
 import { Platform, StyleSheet, Text, View } from 'react-native';
 import { useCartStore } from '../../src/store/cartStore';
-import { Colors, Shadows, Spacing, Typography } from '../../src/theme';
+import { Colors, Spacing, Typography } from '../../src/theme';
 
 interface TabIconProps {
   name: React.ComponentProps<typeof Ionicons>['name'];
@@ -13,9 +13,9 @@ interface TabIconProps {
 
 function TabIcon({ name, label, focused, badge }: TabIconProps) {
   return (
-    <View style={[styles.iconWrap, focused && styles.iconWrapFocused]}>
-      <View style={styles.iconRow}>
-        <Ionicons name={name} size={22} color={focused ? Colors.primary : Colors.textSecondary} />
+    <View style={styles.iconWrap}>
+      <View style={styles.iconContainer}>
+        <Ionicons name={name} size={24} color={focused ? Colors.primary : Colors.textTertiary} />
         {badge ? (
           <View style={styles.badge}>
             <Text style={styles.badgeText}>{badge > 99 ? '99+' : badge}</Text>
@@ -23,6 +23,8 @@ function TabIcon({ name, label, focused, badge }: TabIconProps) {
         ) : null}
       </View>
       <Text style={[styles.tabLabel, focused && styles.tabLabelFocused]}>{label}</Text>
+      {/* Active indicator dot */}
+      {focused && <View style={styles.activeDot} />}
     </View>
   );
 }
@@ -91,15 +93,16 @@ const styles = StyleSheet.create({
   tabBar: {
     backgroundColor: Colors.cardBg,
     borderTopWidth: 1,
-    borderTopColor: Colors.border,
+    borderTopColor: '#E8E8E8',
     height: Platform.OS === 'ios' ? 88 : 68,
     paddingTop: Spacing.sm,
     paddingBottom: Platform.OS === 'ios' ? Spacing.xl : Spacing.sm,
-    ...Shadows.floating,
+    elevation: 8,
+    // Remove default shadow, use elevation only
+    shadowOpacity: 0,
   },
-  iconWrap: { alignItems: 'center', gap: 3, paddingHorizontal: Spacing.xs },
-  iconWrapFocused: {},
-  iconRow: { position: 'relative' },
+  iconWrap: { alignItems: 'center', gap: 3, paddingHorizontal: Spacing.sm, position: 'relative' },
+  iconContainer: { position: 'relative' },
   badge: {
     position: 'absolute',
     top: -4,
@@ -111,8 +114,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 3,
+    borderWidth: 1.5,
+    borderColor: Colors.cardBg,
   },
   badgeText: { color: '#FFF', fontSize: 9, fontWeight: '700' },
-  tabLabel: { ...Typography.label, fontSize: 10, color: Colors.textSecondary },
+  tabLabel: { ...Typography.micro, color: Colors.textTertiary },
   tabLabelFocused: { color: Colors.primary, fontWeight: '700' },
+  activeDot: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: Colors.primary,
+    marginTop: 1,
+  },
 });

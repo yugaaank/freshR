@@ -1,50 +1,46 @@
 import React from 'react';
-import { StyleSheet, Text, TouchableOpacity, View, ViewStyle } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { Colors, Spacing, Typography } from '../../theme';
 
 interface SectionHeaderProps {
     title: string;
     subtitle?: string;
     onSeeAll?: () => void;
-    style?: ViewStyle;
+    style?: object;
+    light?: boolean;
 }
 
-export default function SectionHeader({ title, subtitle, onSeeAll, style }: SectionHeaderProps) {
+export default function SectionHeader({ title, subtitle, onSeeAll, style, light }: SectionHeaderProps) {
     return (
-        <View style={[styles.container, style]}>
+        <View style={[styles.row, { paddingHorizontal: Spacing.section }, style]}>
             <View style={styles.left}>
-                <Text style={styles.title}>{title}</Text>
-                {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
+                <Text style={[styles.title, light && styles.titleLight]}>{title}</Text>
+                {subtitle && <Text style={[styles.sub, light && styles.subLight]}>{subtitle}</Text>}
             </View>
-            {onSeeAll ? (
-                <TouchableOpacity onPress={onSeeAll} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                    <Text style={styles.seeAll}>See all</Text>
-                </TouchableOpacity>
-            ) : null}
+            {onSeeAll && (
+                <Text style={styles.seeAll} onPress={onSeeAll}>
+                    See all →
+                </Text>
+            )}
         </View>
     );
 }
 
 const styles = StyleSheet.create({
-    container: {
+    row: {
         flexDirection: 'row',
-        alignItems: 'flex-end',
+        alignItems: 'baseline',
         justifyContent: 'space-between',
-        paddingHorizontal: Spacing.lg,
         marginBottom: Spacing.md,
     },
     left: { flex: 1 },
-    title: {
-        ...Typography.h3,
-        color: Colors.text,
-    },
-    subtitle: {
-        ...Typography.caption,
-        color: Colors.textSecondary,
-        marginTop: 2,
-    },
+    title: { ...Typography.h2, color: Colors.text },
+    titleLight: { color: '#FFFFFF' },
+    sub: { ...Typography.caption, color: Colors.textSecondary, marginTop: 2 },
+    subLight: { color: 'rgba(255,255,255,0.65)' },
     seeAll: {
-        ...Typography.body2,
+        ...Typography.label,
+        fontSize: 13,
         color: Colors.primary,
         fontWeight: '600',
     },

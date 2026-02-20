@@ -5,14 +5,14 @@ interface CartItem {
     item: MenuItem;
     quantity: number;
     restaurantId: string;
-    restaurantName: string;
+    restaurantName?: string;
 }
 
 interface CartStore {
     items: CartItem[];
     restaurantId: string | null;
     restaurantName: string | null;
-    addItem: (item: MenuItem, restaurantId: string, restaurantName: string) => void;
+    addItem: (item: MenuItem, restaurantId: string, restaurantName?: string) => void;
     removeItem: (itemId: string) => void;
     incrementItem: (itemId: string) => void;
     decrementItem: (itemId: string) => void;

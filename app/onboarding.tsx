@@ -107,7 +107,7 @@ const styles = StyleSheet.create({
         gap: Spacing.xs,
         paddingHorizontal: Spacing.md,
         paddingVertical: Spacing.sm + 2,
-        borderRadius: Radius.full,
+        borderRadius: Radius.pill,
         borderWidth: 1.5,
         borderColor: Colors.border,
         backgroundColor: Colors.cardBg,

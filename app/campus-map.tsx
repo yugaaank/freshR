@@ -219,7 +219,7 @@ const styles = StyleSheet.create({
     filterChip: {
         paddingHorizontal: Spacing.md,
         paddingVertical: Spacing.xs + 2,
-        borderRadius: Radius.full,
+        borderRadius: Radius.pill,
         backgroundColor: Colors.sectionBg,
     },
     filterChipActive: { backgroundColor: Colors.primaryLight },

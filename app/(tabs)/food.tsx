@@ -2,8 +2,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React, { useState } from 'react';
 import {
+    Dimensions,
     FlatList,
-    Image,
     ScrollView,
     StyleSheet,
     Text,
@@ -11,353 +11,298 @@ import {
     View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import SearchBar from '../../src/components/ui/SearchBar';
 import TagPill from '../../src/components/ui/TagPill';
-import { foodCategories, MenuItem, restaurants } from '../../src/data/food';
+import { menuCategories, menuItems, restaurants } from '../../src/data/food';
 import { useCartStore } from '../../src/store/cartStore';
 import { Colors, Radius, Shadows, Spacing, Typography } from '../../src/theme';
 
-export default function FoodScreen() {
-    const [activeCategory, setActiveCategory] = useState('c1');
-    const [activeRestaurant, setActiveRestaurant] = useState(restaurants[0].id);
-    const totalItems = useCartStore((s) => s.totalItems());
-    const totalPrice = useCartStore((s) => s.totalPrice());
+const { width: SW } = Dimensions.get('window');
 
-    const restaurant = restaurants.find((r) => r.id === activeRestaurant) ?? restaurants[0];
-    const filteredMenu =
-        activeCategory === 'c1'
-            ? restaurant.menu
-            : restaurant.menu.filter((m) =>
-                foodCategories.find((c) => c.id === activeCategory)?.name === m.category
-            );
+export default function FoodScreen() {
+    const [activeRestaurantId, setActiveRestaurantId] = useState(restaurants[0].id);
+    const [activeCategory, setActiveCategory] = useState('All');
+    const cart = useCartStore();
+
+    const restaurant = restaurants.find((r) => r.id === activeRestaurantId) ?? restaurants[0];
+    const menuForRestaurant = menuItems.filter(
+        (item) =>
+            item.restaurantId === activeRestaurantId &&
+            (activeCategory === 'All' || item.category === activeCategory)
+    );
+
+    const cartCount = cart.totalItems();
+    const cartTotal = cart.totalPrice();
 
     return (
-        <View style={styles.flex}>
-            <SafeAreaView edges={['top']} style={styles.header}>
-                <Text style={styles.headerTitle}>Campus Food 🍔</Text>
-                <TouchableOpacity style={styles.cartBtn} onPress={() => router.push('/order-tracking')}>
-                    <Ionicons name="bag-outline" size={22} color={Colors.text} />
-                    {totalItems > 0 && (
-                        <View style={styles.cartBadge}>
-                            <Text style={styles.cartBadgeText}>{totalItems}</Text>
-                        </View>
-                    )}
-                </TouchableOpacity>
-            </SafeAreaView>
-
-            <ScrollView showsVerticalScrollIndicator={false} stickyHeaderIndices={[1, 3]}>
-                {/* Search */}
-                <View style={styles.searchWrap}>
-                    <SearchBar placeholder="Search dishes, restaurants..." />
-                </View>
-
-                {/* Restaurant Tabs */}
-                <View style={styles.restaurantTabsWrap}>
-                    <FlatList
-                        horizontal
-                        data={restaurants}
-                        keyExtractor={(r) => r.id}
-                        showsHorizontalScrollIndicator={false}
-                        contentContainerStyle={styles.restaurantTabs}
-                        renderItem={({ item: r }) => (
-                            <TouchableOpacity
-                                style={[styles.restaurantTab, activeRestaurant === r.id && styles.restaurantTabActive]}
-                                onPress={() => setActiveRestaurant(r.id)}
-                            >
-                                <Text style={[styles.restaurantTabText, activeRestaurant === r.id && styles.restaurantTabTextActive]}>
-                                    {r.name}
-                                </Text>
-                                {r.tag && <Text style={styles.restaurantTabTag}>{r.tag.split(' ').slice(0, 2).join(' ')}</Text>}
-                            </TouchableOpacity>
-                        )}
-                    />
-                </View>
-
-                {/* Restaurant Info */}
-                <View style={styles.restaurantInfo}>
-                    <Image source={{ uri: restaurant.image }} style={styles.restaurantBanner} />
-                    <View style={styles.restaurantDetails}>
-                        <View style={styles.restaurantRow}>
-                            <View>
-                                <Text style={styles.restaurantName}>{restaurant.name}</Text>
-                                <Text style={styles.restaurantCuisine}>{restaurant.cuisine}</Text>
-                            </View>
-                            <View style={[restaurant.isOpen ? styles.openBadge : styles.closedBadge]}>
-                                <Text style={styles.openBadgeText}>{restaurant.isOpen ? 'Open' : 'Closed'}</Text>
-                            </View>
-                        </View>
-                        <View style={styles.restaurantStats}>
-                            <View style={styles.stat}>
-                                <Text style={styles.statValue}>⭐ {restaurant.rating}</Text>
-                                <Text style={styles.statLabel}>Rating</Text>
-                            </View>
-                            <View style={styles.statDivider} />
-                            <View style={styles.stat}>
-                                <Text style={styles.statValue}>{restaurant.deliveryTime}</Text>
-                                <Text style={styles.statLabel}>Delivery</Text>
-                            </View>
-                            <View style={styles.statDivider} />
-                            <View style={styles.stat}>
-                                <Text style={styles.statValue}>{restaurant.deliveryFee === 0 ? 'Free' : `₹${restaurant.deliveryFee}`}</Text>
-                                <Text style={styles.statLabel}>Fee</Text>
+        <SafeAreaView style={styles.safe} edges={['top']}>
+            {/* ═══ RESTAURANT BANNER ═══ */}
+            <View style={[styles.banner, { backgroundColor: restaurant.colorBg ?? '#FF6B35' }]}>
+                <View style={styles.bannerOverlay} />
+                <View style={styles.bannerContent}>
+                    <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+                        <Ionicons name="arrow-back" size={20} color="#FFF" />
+                    </TouchableOpacity>
+                    <View style={styles.bannerBottom}>
+                        <Text style={styles.bannerEmoji}>{restaurant.emoji ?? '🍽️'}</Text>
+                        <View>
+                            <Text style={styles.bannerName}>{restaurant.name}</Text>
+                            <Text style={styles.bannerMeta}>{restaurant.cuisine} · {restaurant.deliveryTime}</Text>
+                            <View style={styles.bannerRating}>
+                                <Ionicons name="star" size={12} color="#FFD60A" />
+                                <Text style={styles.bannerRatingText}>{restaurant.rating}</Text>
                             </View>
                         </View>
                     </View>
                 </View>
+            </View>
 
-                {/* Category Row — sticky */}
-                <View style={styles.categoryWrap}>
-                    <FlatList
-                        horizontal
-                        data={foodCategories}
-                        keyExtractor={(c) => c.id}
-                        showsHorizontalScrollIndicator={false}
-                        contentContainerStyle={styles.categoryRow}
-                        renderItem={({ item: c }) => (
-                            <TouchableOpacity
-                                style={[styles.categoryChip, activeCategory === c.id && styles.categoryChipActive]}
-                                onPress={() => setActiveCategory(c.id)}
-                            >
-                                <Text style={styles.categoryEmoji}>{c.icon}</Text>
-                                <Text style={[styles.categoryText, activeCategory === c.id && styles.categoryTextActive]}>
-                                    {c.name}
-                                </Text>
-                            </TouchableOpacity>
-                        )}
-                    />
-                </View>
-
-                {/* Menu Items */}
-                <View style={styles.menuList}>
-                    {filteredMenu.map((item) => (
-                        <MenuItemCard key={item.id} item={item} restaurantId={restaurant.id} restaurantName={restaurant.name} />
-                    ))}
-                </View>
-
-                <View style={{ height: totalItems > 0 ? 90 : 24 }} />
+            {/* ═══ RESTAURANT SELECTOR ═══ */}
+            <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                style={styles.restSelectorWrap}
+                contentContainerStyle={styles.restSelector}
+            >
+                {restaurants.map((r) => (
+                    <TouchableOpacity
+                        key={r.id}
+                        style={[styles.restChip, activeRestaurantId === r.id && styles.restChipActive]}
+                        onPress={() => { setActiveRestaurantId(r.id); setActiveCategory('All'); }}
+                        activeOpacity={0.88}
+                    >
+                        <Text style={[styles.restChipText, activeRestaurantId === r.id && styles.restChipTextActive]}>
+                            {r.name}
+                        </Text>
+                    </TouchableOpacity>
+                ))}
             </ScrollView>
 
-            {/* Floating Cart Bar */}
-            {totalItems > 0 && (
-                <View style={[styles.cartBar, Shadows.floating]}>
-                    <View style={styles.cartBarLeft}>
-                        <View style={styles.cartCount}>
-                            <Text style={styles.cartCountText}>{totalItems}</Text>
+            {/* ═══ CATEGORY FILTER ═══ */}
+            <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.catRow}
+            >
+                {['All', ...menuCategories.map((c) => c.name)].map((cat) => (
+                    <TouchableOpacity
+                        key={cat}
+                        style={[styles.catChip, activeCategory === cat && styles.catChipActive]}
+                        onPress={() => setActiveCategory(cat)}
+                        activeOpacity={0.88}
+                    >
+                        <Text style={[styles.catText, activeCategory === cat && styles.catTextActive]}>{cat}</Text>
+                    </TouchableOpacity>
+                ))}
+            </ScrollView>
+
+            {/* ═══ MENU ITEMS ═══ */}
+            <FlatList
+                data={menuForRestaurant}
+                keyExtractor={(item) => item.id}
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={styles.menuList}
+                ItemSeparatorComponent={() => <View style={styles.separator} />}
+                renderItem={({ item }) => {
+                    const inCart = cart.items.find((c) => c.item.id === item.id);
+                    const qty = inCart?.quantity ?? 0;
+
+                    return (
+                        <View style={styles.menuItem}>
+                            {/* Colored left border strip — replaces veg dot */}
+                            <View style={[styles.vegStrip, { backgroundColor: item.isVeg ? Colors.success : Colors.error }]} />
+
+                            <View style={styles.menuContent}>
+                                <View style={styles.menuLeft}>
+                                    <View style={styles.menuTop}>
+                                        <Text style={styles.menuName}>{item.name}</Text>
+                                        {item.isPopular && (
+                                            <TagPill label="🔥 Popular" variant="orange" size="sm" />
+                                        )}
+                                    </View>
+                                    <Text style={styles.menuDesc} numberOfLines={2}>{item.description}</Text>
+                                    <Text style={styles.menuPrice}>₹{item.price}</Text>
+                                </View>
+
+                                {/* ADD / QTY control */}
+                                <View style={styles.menuRight}>
+                                    {qty === 0 ? (
+                                        <TouchableOpacity
+                                            style={styles.addBtn}
+                                            activeOpacity={0.88}
+                                            onPress={() => cart.addItem(item, activeRestaurantId)}
+                                        >
+                                            <Text style={styles.addBtnText}>ADD</Text>
+                                        </TouchableOpacity>
+                                    ) : (
+                                        <View style={styles.qtyControl}>
+                                            <TouchableOpacity
+                                                style={styles.qtyBtn}
+                                                activeOpacity={0.88}
+                                                onPress={() => cart.decrementItem(item.id)}
+                                            >
+                                                <Ionicons name="remove" size={14} color="#FFF" />
+                                            </TouchableOpacity>
+                                            <Text style={styles.qtyText}>{qty}</Text>
+                                            <TouchableOpacity
+                                                style={styles.qtyBtn}
+                                                activeOpacity={0.88}
+                                                onPress={() => cart.addItem(item, activeRestaurantId)}
+                                            >
+                                                <Ionicons name="add" size={14} color="#FFF" />
+                                            </TouchableOpacity>
+                                        </View>
+                                    )}
+                                </View>
+                            </View>
                         </View>
-                        <Text style={styles.cartBarItems}>{totalItems} item{totalItems > 1 ? 's' : ''} added</Text>
-                    </View>
-                    <TouchableOpacity style={styles.cartBarBtn} onPress={() => router.push('/order-tracking')}>
-                        <Text style={styles.cartBarBtnText}>View Cart · ₹{totalPrice}</Text>
-                        <Ionicons name="arrow-forward" size={16} color="#FFF" />
+                    );
+                }}
+            />
+
+            {/* ═══ FLOATING CART BAR ═══ */}
+            {cartCount > 0 && (
+                <View style={styles.cartBarWrap}>
+                    {/* White fade behind bar */}
+                    <View style={styles.cartBarFade} />
+                    <TouchableOpacity
+                        style={styles.cartBar}
+                        activeOpacity={0.92}
+                        onPress={() => router.push('/order-tracking')}
+                    >
+                        <View style={styles.cartBarLeft}>
+                            <View style={styles.cartCount}>
+                                <Text style={styles.cartCountText}>{cartCount}</Text>
+                            </View>
+                            <Text style={styles.cartBarLabel}>View Cart</Text>
+                        </View>
+                        <View style={styles.cartBarRight}>
+                            <Text style={styles.cartBarPrice}>₹{cartTotal}</Text>
+                            <Ionicons name="arrow-forward" size={16} color="#FFF" />
+                        </View>
                     </TouchableOpacity>
                 </View>
             )}
-        </View>
-    );
-}
-
-function MenuItemCard({ item, restaurantId, restaurantName }: {
-    item: MenuItem;
-    restaurantId: string;
-    restaurantName: string;
-}) {
-    const addItem = useCartStore((s) => s.addItem);
-    const incrementItem = useCartStore((s) => s.incrementItem);
-    const decrementItem = useCartStore((s) => s.decrementItem);
-    const quantity = useCartStore((s) => s.getQuantity(item.id));
-
-    return (
-        <View style={styles.menuCard}>
-            <View style={styles.menuLeft}>
-                <View style={styles.vegRow}>
-                    <View style={[styles.vegDot, { borderColor: item.isVeg ? Colors.success : Colors.error }]}>
-                        <View style={[styles.vegCenter, { backgroundColor: item.isVeg ? Colors.success : Colors.error }]} />
-                    </View>
-                    {item.isBestseller && (
-                        <TagPill label="Bestseller" variant="orange" size="sm" />
-                    )}
-                </View>
-                <Text style={styles.menuName}>{item.name}</Text>
-                <Text style={styles.menuDesc} numberOfLines={2}>{item.description}</Text>
-                <View style={styles.menuPriceRow}>
-                    <Text style={styles.menuPrice}>₹{item.price}</Text>
-                    {item.originalPrice && (
-                        <Text style={styles.menuOriginalPrice}>₹{item.originalPrice}</Text>
-                    )}
-                </View>
-                <Text style={styles.menuTime}>⏱ {item.prepTime} min</Text>
-            </View>
-            <View style={styles.menuRight}>
-                <Image source={{ uri: item.image }} style={styles.menuImage} />
-                {quantity === 0 ? (
-                    <TouchableOpacity
-                        style={styles.addBtn}
-                        onPress={() => addItem(item, restaurantId, restaurantName)}
-                    >
-                        <Text style={styles.addBtnText}>+ ADD</Text>
-                    </TouchableOpacity>
-                ) : (
-                    <View style={styles.qtyControl}>
-                        <TouchableOpacity
-                            style={styles.qtyBtn}
-                            onPress={() => decrementItem(item.id)}
-                        >
-                            <Text style={styles.qtyBtnText}>−</Text>
-                        </TouchableOpacity>
-                        <Text style={styles.qtyCount}>{quantity}</Text>
-                        <TouchableOpacity
-                            style={styles.qtyBtn}
-                            onPress={() => incrementItem(item.id)}
-                        >
-                            <Text style={styles.qtyBtnText}>+</Text>
-                        </TouchableOpacity>
-                    </View>
-                )}
-            </View>
-        </View>
+        </SafeAreaView>
     );
 }
 
 const styles = StyleSheet.create({
-    flex: { flex: 1, backgroundColor: Colors.background },
-    header: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingHorizontal: Spacing.lg,
-        paddingBottom: Spacing.sm,
-        backgroundColor: Colors.background,
+    safe: { flex: 1, backgroundColor: Colors.background },
+
+    // Banner
+    banner: { height: 180, position: 'relative' },
+    bannerOverlay: {
+        ...StyleSheet.absoluteFillObject,
+        backgroundColor: 'rgba(0,0,0,0.40)',
     },
-    headerTitle: { ...Typography.h2, color: Colors.text },
-    cartBtn: { position: 'relative', padding: Spacing.xs },
-    cartBadge: {
-        position: 'absolute',
-        top: 0,
-        right: 0,
-        backgroundColor: Colors.primary,
-        borderRadius: 8,
-        minWidth: 16,
-        height: 16,
+    bannerContent: { flex: 1, padding: Spacing.section, justifyContent: 'space-between' },
+    backBtn: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: 'rgba(0,0,0,0.30)',
         alignItems: 'center',
         justifyContent: 'center',
     },
-    cartBadgeText: { color: '#FFF', fontSize: 9, fontWeight: '700' },
-    searchWrap: { paddingHorizontal: Spacing.lg, paddingBottom: Spacing.sm },
-    restaurantTabsWrap: { backgroundColor: Colors.background, paddingBottom: Spacing.sm },
-    restaurantTabs: { paddingHorizontal: Spacing.lg, gap: Spacing.sm },
-    restaurantTab: {
-        paddingHorizontal: Spacing.md,
-        paddingVertical: Spacing.sm,
-        borderRadius: Radius.md,
-        backgroundColor: Colors.sectionBg,
-        borderWidth: 1.5,
-        borderColor: 'transparent',
+    bannerBottom: { flexDirection: 'row', alignItems: 'flex-end', gap: Spacing.md },
+    bannerEmoji: { fontSize: 52 },
+    bannerName: { ...Typography.h2, color: '#FFF' },
+    bannerMeta: { ...Typography.body2, color: 'rgba(255,255,255,0.75)', marginTop: 2 },
+    bannerRating: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
+    bannerRatingText: { ...Typography.label, color: '#FFD60A', fontSize: 13 },
+
+    // Restaurant selector
+    restSelectorWrap: { borderBottomWidth: 1, borderBottomColor: Colors.border },
+    restSelector: { paddingHorizontal: Spacing.section, paddingVertical: Spacing.sm, gap: 8 },
+    restChip: {
+        paddingHorizontal: 16,
+        paddingVertical: 7,
+        borderRadius: Radius.pill,
+        backgroundColor: Colors.surface,
     },
-    restaurantTabActive: { borderColor: Colors.primary, backgroundColor: Colors.primaryLight },
-    restaurantTabText: { ...Typography.body2, color: Colors.textSecondary, fontWeight: '600' },
-    restaurantTabTextActive: { color: Colors.primary },
-    restaurantTabTag: { ...Typography.caption, color: Colors.textTertiary, fontSize: 10 },
-    restaurantInfo: { marginBottom: Spacing.md },
-    restaurantBanner: { width: '100%', height: 160 },
-    restaurantDetails: {
-        paddingHorizontal: Spacing.lg,
-        paddingVertical: Spacing.md,
-        backgroundColor: Colors.cardBg,
-        borderBottomWidth: 1,
-        borderBottomColor: Colors.divider,
-    },
-    restaurantRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: Spacing.md },
-    restaurantName: { ...Typography.h3, color: Colors.text },
-    restaurantCuisine: { ...Typography.body2, color: Colors.textSecondary, marginTop: 2 },
-    openBadge: { backgroundColor: Colors.successLight, borderRadius: Radius.full, paddingHorizontal: Spacing.sm, paddingVertical: 3 },
-    closedBadge: { backgroundColor: Colors.errorLight, borderRadius: Radius.full, paddingHorizontal: Spacing.sm, paddingVertical: 3 },
-    openBadgeText: { ...Typography.caption, color: Colors.success, fontWeight: '700' },
-    restaurantStats: { flexDirection: 'row', alignItems: 'center' },
-    stat: { flex: 1, alignItems: 'center' },
-    statValue: { ...Typography.h5, color: Colors.text },
-    statLabel: { ...Typography.caption, color: Colors.textSecondary, marginTop: 2 },
-    statDivider: { width: 1, height: 30, backgroundColor: Colors.divider },
-    categoryWrap: { backgroundColor: Colors.background, paddingVertical: Spacing.sm, borderBottomWidth: 1, borderBottomColor: Colors.divider },
-    categoryRow: { paddingHorizontal: Spacing.lg, gap: Spacing.sm },
-    categoryChip: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 5,
-        paddingHorizontal: Spacing.md,
-        paddingVertical: Spacing.xs + 2,
-        borderRadius: Radius.full,
-        backgroundColor: Colors.sectionBg,
-    },
-    categoryChipActive: { backgroundColor: Colors.primaryLight },
-    categoryEmoji: { fontSize: 14 },
-    categoryText: { ...Typography.caption, color: Colors.textSecondary, fontWeight: '600' },
-    categoryTextActive: { color: Colors.primary },
-    menuList: { paddingHorizontal: Spacing.lg, gap: 0 },
-    menuCard: {
-        flexDirection: 'row',
-        alignItems: 'flex-start',
-        paddingVertical: Spacing.lg,
-        borderBottomWidth: 1,
-        borderBottomColor: Colors.divider,
-        gap: Spacing.md,
-    },
-    menuLeft: { flex: 1, gap: 5 },
-    vegRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
-    vegDot: { width: 14, height: 14, borderRadius: 1, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
-    vegCenter: { width: 7, height: 7, borderRadius: 4 },
-    menuName: { ...Typography.h5, color: Colors.text },
-    menuDesc: { ...Typography.caption, color: Colors.textSecondary, lineHeight: 17 },
-    menuPriceRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
-    menuPrice: { ...Typography.price, color: Colors.text },
-    menuOriginalPrice: { ...Typography.body2, color: Colors.textTertiary, textDecorationLine: 'line-through' },
-    menuTime: { ...Typography.caption, color: Colors.textSecondary },
-    menuRight: { alignItems: 'center', gap: Spacing.sm },
-    menuImage: { width: 90, height: 90, borderRadius: Radius.md },
-    addBtn: {
-        borderWidth: 1.5,
-        borderColor: Colors.primary,
-        borderRadius: Radius.sm,
+    restChipActive: { backgroundColor: Colors.primary },
+    restChipText: { ...Typography.label, fontSize: 12, color: Colors.textSecondary, fontWeight: '600' as const },
+    restChipTextActive: { color: '#FFF' },
+
+    // Category filter
+    catRow: { paddingHorizontal: Spacing.section, gap: 8, paddingVertical: Spacing.sm },
+    catChip: {
+        paddingHorizontal: 12,
         paddingVertical: 5,
-        paddingHorizontal: Spacing.md,
-        backgroundColor: Colors.primaryLight,
+        borderRadius: Radius.pill,
+        backgroundColor: Colors.surface,
     },
-    addBtnText: { ...Typography.label, color: Colors.primary, fontWeight: '700' },
+    catChipActive: { backgroundColor: Colors.primaryLight, borderWidth: 1, borderColor: Colors.primary },
+    catText: { ...Typography.label, fontSize: 11, color: Colors.textSecondary, fontWeight: '600' as const },
+    catTextActive: { color: Colors.primary },
+
+    // Menu
+    menuList: { paddingVertical: Spacing.sm, paddingBottom: 100 },
+    separator: { height: 1, backgroundColor: Colors.divider, marginLeft: 20 },
+    menuItem: { flexDirection: 'row', backgroundColor: Colors.cardBg },
+    vegStrip: { width: 4 },
+    menuContent: { flex: 1, flexDirection: 'row', padding: Spacing.md, gap: Spacing.md },
+    menuLeft: { flex: 1, gap: 5 },
+    menuTop: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, flexWrap: 'wrap' },
+    menuName: { ...Typography.h5, color: Colors.text, flex: 1 },
+    menuDesc: { ...Typography.caption, color: Colors.textSecondary, lineHeight: 17 },
+    menuPrice: { ...Typography.label, color: Colors.text, fontSize: 14, fontWeight: '700' as const },
+    menuRight: { justifyContent: 'center', alignItems: 'center' },
+    // ADD button — solid fill pill (Blinkit spec)
+    addBtn: {
+        backgroundColor: Colors.primary,
+        borderRadius: Radius.pill,
+        paddingHorizontal: 20,
+        paddingVertical: 8,
+    },
+    addBtnText: { ...Typography.label, color: '#FFF', fontSize: 13, fontWeight: '700' as const },
     qtyControl: {
         flexDirection: 'row',
         alignItems: 'center',
-        borderWidth: 1.5,
-        borderColor: Colors.primary,
-        borderRadius: Radius.sm,
-        overflow: 'hidden',
-        backgroundColor: Colors.primaryLight,
-    },
-    qtyBtn: { padding: 6, paddingHorizontal: Spacing.sm },
-    qtyBtnText: { ...Typography.h5, color: Colors.primary },
-    qtyCount: { paddingHorizontal: Spacing.sm, ...Typography.h5, color: Colors.primary },
-    cartBar: {
-        position: 'absolute',
-        bottom: 20,
-        left: Spacing.lg,
-        right: Spacing.lg,
         backgroundColor: Colors.primary,
-        borderRadius: Radius.xl,
+        borderRadius: Radius.pill,
+        overflow: 'hidden',
+    },
+    qtyBtn: { padding: 8, paddingHorizontal: 10 },
+    qtyText: { ...Typography.label, color: '#FFF', fontSize: 14, minWidth: 24, textAlign: 'center' },
+
+    // Cart bar
+    cartBarWrap: {
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        paddingHorizontal: Spacing.section,
+        paddingBottom: Spacing.xl,
+    },
+    cartBarFade: {
+        position: 'absolute',
+        left: 0,
+        right: 0,
+        bottom: 0,
+        height: 90,
+        backgroundColor: 'rgba(255,255,255,0.95)',
+    },
+    cartBar: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        paddingVertical: Spacing.md,
-        paddingHorizontal: Spacing.lg,
+        backgroundColor: Colors.primary,
+        borderRadius: Radius.xl,
+        padding: Spacing.lg,
+        ...Shadows.colored(Colors.primary),
     },
-    cartBarLeft: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
+    cartBarLeft: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md },
     cartCount: {
-        width: 24,
-        height: 24,
-        borderRadius: 12,
-        backgroundColor: 'rgba(255,255,255,0.2)',
+        width: 26,
+        height: 26,
+        borderRadius: 13,
+        backgroundColor: 'rgba(255,255,255,0.25)',
         alignItems: 'center',
         justifyContent: 'center',
     },
-    cartCountText: { ...Typography.caption, color: '#FFF', fontWeight: '700' },
-    cartBarItems: { ...Typography.body2, color: '#FFF', fontWeight: '600' },
-    cartBarBtn: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs },
-    cartBarBtnText: { ...Typography.h5, color: '#FFF', fontWeight: '700' },
+    cartCountText: { ...Typography.label, color: '#FFF', fontSize: 12 },
+    cartBarLabel: { ...Typography.h5, color: '#FFF' },
+    cartBarRight: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
+    cartBarPrice: { ...Typography.price, color: '#FFF' },
 });
