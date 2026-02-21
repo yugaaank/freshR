@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
     ScrollView,
@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Card from '../src/components/ui/Card';
+import { useOrderStatus } from '../src/hooks/useOrders';
 import { useCartStore } from '../src/store/cartStore';
 import { Colors, Radius, Spacing, Typography } from '../src/theme';
 
@@ -20,22 +21,39 @@ const STEPS = [
     { id: 4, label: 'Delivered', icon: 'home', desc: 'Enjoy your meal!' },
 ];
 
+// Map Supabase order_status enum → step number
+const STATUS_STEP: Record<string, number> = {
+    pending: 1,
+    confirmed: 2,
+    preparing: 2,
+    ready: 3,
+    delivered: 4,
+    cancelled: 1,
+};
+
 export default function OrderTrackingScreen() {
-    const [currentStep, setCurrentStep] = useState(2);
+    const { orderId: routeOrderId } = useLocalSearchParams<{ orderId?: string }>();
     const items = useCartStore((s) => s.items);
     const totalPrice = useCartStore((s) => s.totalPrice());
     const clearCart = useCartStore((s) => s.clearCart);
 
-    // Simulate progress
+    // Real-time order status from Supabase
+    const liveStatus = useOrderStatus(routeOrderId ?? null);
+    const currentStep = liveStatus ? (STATUS_STEP[liveStatus] ?? 1) : 2;
+
+    // Fallback simulated progress when no real order is tracked
+    const [simStep, setSimStep] = useState(2);
     useEffect(() => {
+        if (routeOrderId) return; // skip simulation if we have a real order
         const timers = [
-            setTimeout(() => setCurrentStep(2), 3000),
-            setTimeout(() => setCurrentStep(3), 8000),
+            setTimeout(() => setSimStep(2), 3000),
+            setTimeout(() => setSimStep(3), 8000),
         ];
         return () => timers.forEach(clearTimeout);
-    }, []);
+    }, [routeOrderId]);
 
-    const orderId = '#CO' + Math.floor(Math.random() * 90000 + 10000);
+    const displayStep = routeOrderId ? currentStep : simStep;
+    const displayOrderId = routeOrderId ? `#${routeOrderId.slice(-6).toUpperCase()}` : '#CO' + Math.floor(Math.random() * 90000 + 10000);
     const eta = '15–20 min';
 
     return (
@@ -54,14 +72,14 @@ export default function OrderTrackingScreen() {
                     <View style={styles.statusTop}>
                         <View style={styles.statusIcon}>
                             <Ionicons
-                                name={STEPS[currentStep - 1].icon as any}
+                                name={STEPS[displayStep - 1].icon as any}
                                 size={32}
                                 color={Colors.primary}
                             />
                         </View>
                         <View style={styles.statusInfo}>
-                            <Text style={styles.statusLabel}>{STEPS[currentStep - 1].label}</Text>
-                            <Text style={styles.statusDesc}>{STEPS[currentStep - 1].desc}</Text>
+                            <Text style={styles.statusLabel}>{STEPS[displayStep - 1].label}</Text>
+                            <Text style={styles.statusDesc}>{STEPS[displayStep - 1].desc}</Text>
                         </View>
                     </View>
                     <View style={styles.etaRow}>
@@ -73,15 +91,15 @@ export default function OrderTrackingScreen() {
                 {/* Order ID */}
                 <View style={styles.orderIdRow}>
                     <Text style={styles.orderIdLabel}>Order</Text>
-                    <Text style={styles.orderId}>{orderId}</Text>
+                    <Text style={styles.orderId}>{displayOrderId}</Text>
                 </View>
 
                 {/* Progress Steps */}
                 <Card style={styles.stepsCard} padding={Spacing.xl} shadow="sm">
                     {STEPS.map((step, idx) => {
-                        const isCompleted = step.id < currentStep;
-                        const isActive = step.id === currentStep;
-                        const isPending = step.id > currentStep;
+                        const isCompleted = step.id < displayStep;
+                        const isActive = step.id === displayStep;
+                        const isPending = step.id > displayStep;
 
                         return (
                             <View key={step.id} style={styles.stepRow}>

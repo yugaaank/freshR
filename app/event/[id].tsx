@@ -3,6 +3,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useState } from 'react';
 import {
+    ActivityIndicator,
     Image,
     ScrollView,
     StyleSheet,
@@ -14,16 +15,44 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import BottomActionBar from '../../src/components/ui/BottomActionBar';
 import TagPill from '../../src/components/ui/TagPill';
 import UrgencyTag from '../../src/components/ui/UrgencyTag';
-import { events } from '../../src/data/events';
+import { useEvent, useEventSeats, useRegisterEvent } from '../../src/hooks/useEvents';
+import { useUserStore } from '../../src/store/userStore';
 import { Colors, Radius, Spacing, Typography } from '../../src/theme';
 
 export default function EventDetailScreen() {
     const { id } = useLocalSearchParams<{ id: string }>();
-    const event = events.find((e) => e.id === id) ?? events[0];
-    const [selectedTicket, setSelectedTicket] = useState(0);
-    const [registered, setRegistered] = useState(event.isRegistered);
 
-    const ticket = event.tickets[selectedTicket];
+    // Live data from Supabase
+    const { data: event, isLoading } = useEvent(id);
+    const authUser = useUserStore((s) => s.authUser);
+    const registeredIds = useUserStore((s) => s.profile);
+    const registerMutation = useRegisterEvent(authUser?.id ?? null);
+
+    const [selectedTicket, setSelectedTicket] = useState(0);
+    const [localRegistered, setLocalRegistered] = useState(false);
+
+    // Live seat count via Supabase Realtime
+    const liveRegisteredCount = useEventSeats(id, event?.registered_count ?? 0);
+    const seatsLeft = (event?.total_seats ?? 0) - liveRegisteredCount;
+
+    if (isLoading || !event) {
+        return (
+            <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+                <ActivityIndicator color={Colors.primary} />
+            </View>
+        );
+    }
+
+    const tickets = (event.tickets as any[]) ?? [];
+    const ticket = tickets[selectedTicket] ?? { type: 'General', price: 0, available: seatsLeft };
+    const registered = localRegistered;
+
+    const handleRegister = () => {
+        setLocalRegistered(true);
+        if (authUser?.id) {
+            registerMutation.mutate({ eventId: event.id, register: true });
+        }
+    };
 
     // Derived color for tags
     const getTagVariant = (tag: string) => {
@@ -40,7 +69,7 @@ export default function EventDetailScreen() {
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
                 {/* Hero */}
                 <View style={styles.hero}>
-                    <Image source={{ uri: event.image }} style={styles.heroImage} />
+                    <Image source={{ uri: event.image ?? undefined }} style={styles.heroImage} />
                     <View style={styles.heroOverlay} />
                     <SafeAreaView edges={['top']} style={styles.heroHeader}>
                         <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
@@ -60,7 +89,7 @@ export default function EventDetailScreen() {
                         <View style={styles.heroMetaSpacing}>
                             <View style={styles.heroMeta}>
                                 <Ionicons name="people-outline" size={13} color="rgba(255,255,255,0.8)" />
-                                <Text style={styles.heroMetaText}>{event.attendees} attending</Text>
+                                <Text style={styles.heroMetaText}>{event.registered_count} attending</Text>
                             </View>
 
                             {/* Who's Attending Avatar Snippet */}
@@ -69,7 +98,7 @@ export default function EventDetailScreen() {
                                 <Image source={{ uri: 'https://i.pravatar.cc/100?img=2' }} style={styles.avatarStack} />
                                 <Image source={{ uri: 'https://i.pravatar.cc/100?img=3' }} style={styles.avatarStack} />
                                 <View style={styles.avatarMore}>
-                                    <Text style={styles.avatarMoreText}>+{(event.attendees ?? 42) - 3}</Text>
+                                    <Text style={styles.avatarMoreText}>+{(event.registered_count ?? 42) - 3}</Text>
                                 </View>
                             </View>
                         </View>
@@ -96,9 +125,9 @@ export default function EventDetailScreen() {
                         ))}
                     </View>
 
-                    {event.seatsLeft < 20 && (
+                    {seatsLeft < 20 && (
                         <UrgencyTag
-                            label={`Only ${event.seatsLeft} seats remaining!`}
+                            label={`Only ${seatsLeft} seats remaining!`}
                             variant="danger"
                             style={{ alignSelf: 'stretch', marginBottom: Spacing.lg }}
                         />
@@ -117,7 +146,7 @@ export default function EventDetailScreen() {
 
                     {/* Ticket Selection */}
                     <Text style={[styles.sectionTitle, { marginTop: Spacing.lg }]}>Select Ticket</Text>
-                    {event.tickets.map((t, idx) => (
+                    {tickets.map((t, idx) => (
                         <TouchableOpacity
                             key={idx}
                             style={[styles.ticketRow, selectedTicket === idx && styles.ticketRowActive]}
@@ -151,10 +180,10 @@ export default function EventDetailScreen() {
                 />
                 <BottomActionBar
                     leftLabel={ticket.price === 0 ? 'Free Entry' : `₹${ticket.price}`}
-                    leftSubLabel={registered ? '✅ Registered' : `${ticket.available} spots left`}
+                    leftSubLabel={registered ? '✅ Registered' : `${seatsLeft} spots left`}
                     buttonLabel={registered ? 'Registered ✓' : 'Register Now'}
-                    onPress={() => setRegistered(true)}
-                    disabled={registered}
+                    onPress={handleRegister}
+                    disabled={registered || seatsLeft <= 0}
                     style={{ backgroundColor: 'transparent', borderTopWidth: 0, shadowOpacity: 0, elevation: 0 }}
                 />
             </View>

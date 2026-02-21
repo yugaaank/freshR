@@ -24,16 +24,16 @@ import Animated, {
   withSpring,
 } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { events } from '../../src/data/events';
-import { campusAlerts } from '../../src/data/homeData';
-import { Colors, Radius, Shadows, Spacing, Typography } from '../../src/theme';
 import TagPill from '../../src/components/ui/TagPill';
+import { useCampusAlerts } from '../../src/hooks/useCampusAlerts';
+import { useHybridStore } from '../../src/store/hybridStore';
+import { Colors, Radius, Shadows, Spacing, Typography } from '../../src/theme';
 
 const { width: SW } = Dimensions.get('window');
 const CARD_GAP = 12;
 const CARD_SIZE = (SW - Spacing.section * 2 - CARD_GAP) / 2;
 
-const featuredEvent = events.find((ev) => ev.isFeatured) ?? events[0];
+
 
 // ─── Service cards (Swiggy-style 2×2 grid) ───────────────────────────────────
 const SERVICE_CARDS = [
@@ -142,6 +142,9 @@ function SpringCard({ children, style, onPress, delay = 0, ...props }: any) {
 
 export default function HomeScreen() {
   const [search, setSearch] = useState('');
+  const { data: liveAlerts = [] } = useCampusAlerts();
+  const storeEvents = useHybridStore((s) => s.events);
+  const featuredEvent = storeEvents.find((ev: any) => ev.is_featured || ev.isFeatured) ?? storeEvents[0];
 
   const scrollRef = useAnimatedRef<Animated.ScrollView>();
   const scrollOffset = useScrollViewOffset(scrollRef);
@@ -156,9 +159,11 @@ export default function HomeScreen() {
 
   const searchLower = search.trim().toLowerCase();
 
-  const filteredEvents = events.filter((e) =>
+  const filteredEvents = storeEvents.filter((e: any) =>
     searchLower === '' || e.title.toLowerCase().includes(searchLower) || e.category.toLowerCase().includes(searchLower)
   ).slice(0, 5);
+
+  const campusAlerts = liveAlerts;
 
   const filteredCards = SERVICE_CARDS.filter((c) =>
     searchLower === '' || c.title.toLowerCase().includes(searchLower) || c.subtitle.toLowerCase().includes(searchLower)
@@ -211,7 +216,7 @@ export default function HomeScreen() {
         contentContainerStyle={styles.scroll}
       >
         {/* ═══ FEATURED EVENT HERO ═══ */}
-        <SpringCard style={styles.featureBannerWrap} delay={100} onPress={() => router.push(`/event/${featuredEvent.id}` as any)}>
+        <SpringCard style={styles.featureBannerWrap} delay={100} onPress={() => featuredEvent && router.push(`/event/${(featuredEvent as any).id}` as any)}>
           <LinearGradient
             colors={['#14172B', '#1C1C1E']}
             start={{ x: 0, y: 0 }}
@@ -220,14 +225,14 @@ export default function HomeScreen() {
           >
             <View>
               <Text style={styles.featureLabel}>Spotlight</Text>
-              <Text style={styles.featureTitle}>{featuredEvent.title}</Text>
-              <Text style={styles.featureMeta}>{featuredEvent.date} · {featuredEvent.time}</Text>
+              <Text style={styles.featureTitle}>{featuredEvent ? (featuredEvent as any).title : 'Upcoming Event'}</Text>
+              <Text style={styles.featureMeta}>{featuredEvent ? `${(featuredEvent as any).date} · ${(featuredEvent as any).time}` : ''}</Text>
               <View style={styles.featureBadgeRow}>
-                <TagPill label={featuredEvent.category} variant="orange" size="sm" />
-                <Text style={styles.featureBadgeText}>{featuredEvent.seatsLeft} seats left</Text>
+                <TagPill label={(featuredEvent as any)?.category ?? 'Event'} variant="orange" size="sm" />
+                <Text style={styles.featureBadgeText}>{((featuredEvent as any)?.total_seats ?? (featuredEvent as any)?.seatsLeft ?? 0) > 0 ? `${((featuredEvent as any)?.total_seats ?? (featuredEvent as any)?.seatsLeft) - ((featuredEvent as any)?.registered_count ?? 0)} seats left` : 'Free entry'}</Text>
               </View>
             </View>
-            <Text style={styles.featureEmoji}>{featuredEvent.emoji ?? '🎫'}</Text>
+            <Text style={styles.featureEmoji}>{(featuredEvent as any)?.emoji ?? '🎫'}</Text>
           </LinearGradient>
         </SpringCard>
 
@@ -342,8 +347,8 @@ export default function HomeScreen() {
                   onPress={() => router.push(`/event/${ev.id}` as any)}
                 >
                   <ImageBackground
-                    source={{ uri: ev.image }}
-                    style={[StyleSheet.absoluteFill, { backgroundColor: ev.colorBg ?? '#1C1C1E' }]}
+                    source={{ uri: (ev as any).image }}
+                    style={[StyleSheet.absoluteFill, { backgroundColor: (ev as any).colorBg ?? (ev as any).color_bg ?? '#1C1C1E' }]}
                     imageStyle={{ borderRadius: Radius.xl }}
                   >
                     <LinearGradient
@@ -356,9 +361,9 @@ export default function HomeScreen() {
                         <View style={styles.eventCatPill}>
                           <Text style={styles.eventCatText}>{ev.category}</Text>
                         </View>
-                        {ev.seatsLeft <= 15 && (
+                        {((ev as any).seatsLeft ?? ((ev as any).total_seats - (ev as any).registered_count) ?? 999) <= 15 && (
                           <View style={styles.urgencyPill}>
-                            <Text style={styles.urgencyText}>⚡ {ev.seatsLeft} left</Text>
+                            <Text style={styles.urgencyText}>⚡ {(ev as any).seatsLeft ?? ((ev as any).total_seats - (ev as any).registered_count) ?? ''} left</Text>
                           </View>
                         )}
                       </View>
@@ -618,14 +623,14 @@ const styles = StyleSheet.create({
   printStat: {
     ...Typography.caption,
     color: Colors.primaryDark,
-    fontWeight: '600',
+    fontWeight: '600' as const,
   },
   printCue: {
     ...Typography.display,
     fontSize: 40,
     opacity: 0.4,
   },
-  card: {
+  serviceGrid: {
     flex: 1,
     padding: Spacing.md,
     justifyContent: 'space-between',

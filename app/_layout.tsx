@@ -13,6 +13,7 @@ import {
   Sora_800ExtraBold,
   useFonts,
 } from '@expo-google-fonts/sora';
+import SupabaseDataBridge from '../src/components/SupabaseDataBridge';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -38,6 +39,8 @@ export default function RootLayout() {
 
   return (
     <QueryClientProvider client={queryClient}>
+      {/* Headless bridge: initialises auth + seeds hybridStore from Supabase */}
+      <SupabaseDataBridge />
       <ThemeProvider value={DefaultTheme}>
         <Stack screenOptions={{ headerShown: false }}>
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
@@ -55,3 +58,4 @@ export default function RootLayout() {
     </QueryClientProvider>
   );
 }
+

@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React, { useState } from 'react';
 import {
+    ActivityIndicator,
     FlatList,
     Image,
     StyleSheet,
@@ -12,7 +13,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Card from '../src/components/ui/Card';
 import SearchBar from '../src/components/ui/SearchBar';
-import { teachers } from '../src/data/teachers';
+import { useTeachers } from '../src/hooks/useTeachers';
+import { Teacher } from '../src/lib/types/database.types';
 import { Colors, Radius, Spacing, Typography } from '../src/theme';
 
 function MiniContributionGraph({ data }: { data: number[] }) {
@@ -39,8 +41,10 @@ const graphStyles = StyleSheet.create({
 
 export default function TeacherDashboard() {
     const [search, setSearch] = useState('');
+    const { data: teachers = [], isLoading } = useTeachers();
+
     const filtered = teachers.filter(
-        (t) =>
+        (t: Teacher) =>
             t.name.toLowerCase().includes(search.toLowerCase()) ||
             t.subject.toLowerCase().includes(search.toLowerCase())
     );
@@ -63,79 +67,86 @@ export default function TeacherDashboard() {
                 />
             </View>
 
-            <FlatList
-                data={filtered}
-                keyExtractor={(t) => t.id}
-                contentContainerStyle={styles.list}
-                showsVerticalScrollIndicator={false}
-                renderItem={({ item: teacher }) => (
-                    <Card style={styles.card} padding={Spacing.md} shadow="sm">
-                        {/* Top Row */}
-                        <View style={styles.cardTop}>
-                            <View style={styles.avatarWrap}>
-                                <Image source={{ uri: teacher.image }} style={styles.avatar} />
-                                <View style={[styles.availDot, { backgroundColor: teacher.isAvailableNow ? Colors.success : Colors.error }]} />
+            {isLoading ? (
+                <View style={styles.loading}>
+                    <ActivityIndicator color={Colors.primary} size="large" />
+                </View>
+            ) : (
+                <FlatList
+                    data={filtered}
+                    keyExtractor={(t) => t.id}
+                    contentContainerStyle={styles.list}
+                    showsVerticalScrollIndicator={false}
+                    renderItem={({ item: teacher }) => (
+                        <Card style={styles.card} padding={Spacing.md} shadow="sm">
+                            {/* Top Row */}
+                            <View style={styles.cardTop}>
+                                <View style={styles.avatarWrap}>
+                                    <Image source={{ uri: teacher.image ?? undefined }} style={styles.avatar} />
+                                    <View style={[styles.availDot, { backgroundColor: teacher.is_available_now ? Colors.success : Colors.error }]} />
+                                </View>
+                                <View style={styles.teacherInfo}>
+                                    <Text style={styles.teacherName}>{teacher.name}</Text>
+                                    <Text style={styles.teacherSubject}>{teacher.subject}</Text>
+                                    <Text style={styles.teacherDept}>{teacher.department} · {teacher.experience} yrs</Text>
+                                </View>
+                                <View style={styles.ratingBox}>
+                                    <Text style={styles.ratingVal}>⭐ {teacher.rating}</Text>
+                                    <Text style={styles.ratingCount}>{teacher.review_count} reviews</Text>
+                                </View>
                             </View>
-                            <View style={styles.teacherInfo}>
-                                <Text style={styles.teacherName}>{teacher.name}</Text>
-                                <Text style={styles.teacherSubject}>{teacher.subject}</Text>
-                                <Text style={styles.teacherDept}>{teacher.department} · {teacher.experience} yrs</Text>
-                            </View>
-                            <View style={styles.ratingBox}>
-                                <Text style={styles.ratingVal}>⭐ {teacher.rating}</Text>
-                                <Text style={styles.ratingCount}>{teacher.reviewCount} reviews</Text>
-                            </View>
-                        </View>
 
-                        {/* Graph */}
-                        <View style={styles.graphRow}>
-                            <View style={styles.graphLeft}>
-                                <Text style={styles.graphLabel}>Weekly Classes (12 wk)</Text>
-                                <MiniContributionGraph data={teacher.weeklyClasses} />
+                            {/* Graph */}
+                            <View style={styles.graphRow}>
+                                <View style={styles.graphLeft}>
+                                    <Text style={styles.graphLabel}>Weekly Classes (12 wk)</Text>
+                                    <MiniContributionGraph data={teacher.weekly_classes ?? []} />
+                                </View>
+                                <View style={styles.availBadge}>
+                                    <Text style={[styles.availText, { color: teacher.is_available_now ? Colors.success : Colors.error }]}>
+                                        {teacher.is_available_now ? '● Available' : '○ Unavailable'}
+                                    </Text>
+                                </View>
                             </View>
-                            <View style={styles.availBadge}>
-                                <Text style={[styles.availText, { color: teacher.isAvailableNow ? Colors.success : Colors.error }]}>
-                                    {teacher.isAvailableNow ? '● Available' : '○ Unavailable'}
-                                </Text>
-                            </View>
-                        </View>
 
-                        {/* Info Row */}
-                        <View style={styles.infoRow}>
-                            <View style={styles.infoItem}>
-                                <Ionicons name="time-outline" size={14} color={Colors.textSecondary} />
-                                <Text style={styles.infoText}>{teacher.officeHours}</Text>
+                            {/* Info Row */}
+                            <View style={styles.infoRow}>
+                                <View style={styles.infoItem}>
+                                    <Ionicons name="time-outline" size={14} color={Colors.textSecondary} />
+                                    <Text style={styles.infoText}>{teacher.office_hours}</Text>
+                                </View>
+                                <View style={styles.infoItem}>
+                                    <Ionicons name="location-outline" size={14} color={Colors.textSecondary} />
+                                    <Text style={styles.infoText}>Cabin {teacher.cabin}</Text>
+                                </View>
                             </View>
-                            <View style={styles.infoItem}>
-                                <Ionicons name="location-outline" size={14} color={Colors.textSecondary} />
-                                <Text style={styles.infoText}>Cabin {teacher.cabin}</Text>
-                            </View>
-                        </View>
 
-                        {/* Action Buttons */}
-                        <View style={styles.actionsRow}>
-                            <TouchableOpacity style={styles.emailBtn}>
-                                <Ionicons name="mail-outline" size={14} color={Colors.primary} />
-                                <Text style={styles.emailBtnText}>Email</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity style={styles.reviewBtn}>
-                                <Text style={styles.reviewBtnText}>Write Review</Text>
-                            </TouchableOpacity>
+                            {/* Action Buttons */}
+                            <View style={styles.actionsRow}>
+                                <TouchableOpacity style={styles.emailBtn}>
+                                    <Ionicons name="mail-outline" size={14} color={Colors.primary} />
+                                    <Text style={styles.emailBtnText}>Email</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity style={styles.reviewBtn}>
+                                    <Text style={styles.reviewBtnText}>Write Review</Text>
+                                </TouchableOpacity>
+                            </View>
+                        </Card>
+                    )}
+                    ListEmptyComponent={
+                        <View style={styles.empty}>
+                            <Text style={styles.emptyText}>No teachers found 🙁</Text>
                         </View>
-                    </Card>
-                )}
-                ListEmptyComponent={
-                    <View style={styles.empty}>
-                        <Text style={styles.emptyText}>No teachers found 🙁</Text>
-                    </View>
-                }
-            />
+                    }
+                />
+            )}
         </SafeAreaView>
     );
 }
 
 const styles = StyleSheet.create({
     safe: { flex: 1, backgroundColor: Colors.sectionBg },
+    loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
     header: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -169,23 +180,14 @@ const styles = StyleSheet.create({
     infoText: { ...Typography.caption, color: Colors.textSecondary, flex: 1 },
     actionsRow: { flexDirection: 'row', gap: Spacing.sm },
     emailBtn: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 5,
-        flex: 1,
-        borderWidth: 1.5,
-        borderColor: Colors.primary,
-        borderRadius: Radius.sm,
-        paddingVertical: Spacing.sm,
-        justifyContent: 'center',
+        flexDirection: 'row', alignItems: 'center', gap: 5, flex: 1,
+        borderWidth: 1.5, borderColor: Colors.primary,
+        borderRadius: Radius.sm, paddingVertical: Spacing.sm, justifyContent: 'center',
     },
     emailBtnText: { ...Typography.body2, color: Colors.primary, fontWeight: '600' },
     reviewBtn: {
-        flex: 1,
-        backgroundColor: Colors.primary,
-        borderRadius: Radius.sm,
-        paddingVertical: Spacing.sm,
-        alignItems: 'center',
+        flex: 1, backgroundColor: Colors.primary,
+        borderRadius: Radius.sm, paddingVertical: Spacing.sm, alignItems: 'center',
     },
     reviewBtnText: { ...Typography.body2, color: '#FFF', fontWeight: '700' },
     empty: { alignItems: 'center', paddingTop: 60 },

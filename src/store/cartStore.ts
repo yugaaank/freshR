@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { MenuItem } from '../data/food';
+import { placeOrder } from '../lib/db/orders';
 
 interface CartItem {
     item: MenuItem;
@@ -20,6 +21,8 @@ interface CartStore {
     totalItems: () => number;
     totalPrice: () => number;
     getQuantity: (itemId: string) => number;
+    /** Place the cart as an order and return the new orderId */
+    checkout: (userId: string) => Promise<string>;
 }
 
 export const useCartStore = create<CartStore>((set, get) => ({
@@ -30,27 +33,14 @@ export const useCartStore = create<CartStore>((set, get) => ({
     addItem: (item, restaurantId, restaurantName) => {
         const { items, restaurantId: currentRestaurantId } = get();
         if (currentRestaurantId && currentRestaurantId !== restaurantId) {
-            // New restaurant — clear old cart
-            set({
-                items: [{ item, quantity: 1, restaurantId, restaurantName }],
-                restaurantId,
-                restaurantName,
-            });
+            set({ items: [{ item, quantity: 1, restaurantId, restaurantName }], restaurantId, restaurantName });
             return;
         }
         const existing = items.find((c) => c.item.id === item.id);
         if (existing) {
-            set({
-                items: items.map((c) =>
-                    c.item.id === item.id ? { ...c, quantity: c.quantity + 1 } : c
-                ),
-            });
+            set({ items: items.map((c) => c.item.id === item.id ? { ...c, quantity: c.quantity + 1 } : c) });
         } else {
-            set({
-                items: [...items, { item, quantity: 1, restaurantId, restaurantName }],
-                restaurantId,
-                restaurantName,
-            });
+            set({ items: [...items, { item, quantity: 1, restaurantId, restaurantName }], restaurantId, restaurantName });
         }
     },
 
@@ -60,11 +50,7 @@ export const useCartStore = create<CartStore>((set, get) => ({
     },
 
     incrementItem: (itemId) => {
-        set({
-            items: get().items.map((c) =>
-                c.item.id === itemId ? { ...c, quantity: c.quantity + 1 } : c
-            ),
-        });
+        set({ items: get().items.map((c) => c.item.id === itemId ? { ...c, quantity: c.quantity + 1 } : c) });
     },
 
     decrementItem: (itemId) => {
@@ -78,11 +64,26 @@ export const useCartStore = create<CartStore>((set, get) => ({
 
     totalItems: () => get().items.reduce((acc, c) => acc + c.quantity, 0),
 
-    totalPrice: () =>
-        get().items.reduce((acc, c) => acc + c.item.price * c.quantity, 0),
+    totalPrice: () => get().items.reduce((acc, c) => acc + c.item.price * c.quantity, 0),
 
     getQuantity: (itemId) => {
         const found = get().items.find((c) => c.item.id === itemId);
         return found ? found.quantity : 0;
+    },
+
+    checkout: async (userId: string) => {
+        const { items, restaurantId, totalPrice } = get();
+        if (!restaurantId || items.length === 0) throw new Error('Cart is empty');
+
+        const cartItems = items.map((c) => ({
+            menuItemId: c.item.id,
+            quantity: c.quantity,
+            unitPrice: c.item.price,
+        }));
+
+        const orderId = await placeOrder(userId, restaurantId, cartItems, totalPrice());
+        // Clear cart only after successful order creation
+        get().clearCart();
+        return orderId;
     },
 }));
