@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { Animated, ScrollView, StyleSheet, View, ViewStyle } from 'react-native';
-import { StreakDay } from '../../data/challenges';
+import { StreakDay } from '../../store/challengeStore';
 import { Colors, Radius } from '../../theme';
 
 interface StreakGridProps {
@@ -8,14 +8,14 @@ interface StreakGridProps {
     style?: ViewStyle;
 }
 
-const CELL_SIZE = 11;
-const CELL_GAP = 2;
+const CELL_SIZE = 10;
+const CELL_GAP = 3;
 
 function getColor(solved: number): string {
-    if (solved === 0) return Colors.sectionBg;
-    if (solved === 1) return '#C6EFCE';
-    if (solved === 2) return '#70C97A';
-    return '#0C9B52';
+    if (solved === 0) return Colors.surface;
+    if (solved === 1) return '#0e4429'; // GitHub Dark L1
+    if (solved === 2) return '#006d21'; // GitHub Dark L2
+    return '#26a641'; // GitHub Dark L3
 }
 
 export default function StreakGrid({ data, style }: StreakGridProps) {

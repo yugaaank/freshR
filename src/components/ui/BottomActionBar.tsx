@@ -2,7 +2,7 @@ import { BlurView } from 'expo-blur';
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View, ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Colors, Radius, Shadows, Spacing, Typography } from '../../theme';
+import { Colors, Radius, Spacing, Typography } from '../../theme';
 
 interface BottomActionBarProps {
     leftLabel?: string;
@@ -29,7 +29,6 @@ export default function BottomActionBar({
             tint="light"
             style={[
                 styles.container,
-                Shadows.floating,
                 { paddingBottom: insets.bottom + Spacing.md },
                 style,
             ]}

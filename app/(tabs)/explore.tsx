@@ -9,84 +9,41 @@ import {
     StatusBar,
     StyleSheet,
     Text,
-    TextInput,
     TouchableOpacity,
     View,
+    ActivityIndicator,
 } from 'react-native';
-import Animated, {
-    FadeInDown,
-    Layout,
-    useAnimatedStyle,
-    useSharedValue,
-    withSpring,
-} from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import SectionHeader from '../../src/components/ui/SectionHeader';
 import TagPill from '../../src/components/ui/TagPill';
 import Card from '../../src/components/ui/Card';
-import { useHybridStore } from '../../src/store/hybridStore';
-import { Colors, Radius, Shadows, Spacing, Typography } from '../../src/theme';
+import SearchBar from '../../src/components/ui/SearchBar';
+import { useClubs } from '../../src/hooks/useClubs';
+import { useEvents } from '../../src/hooks/useEvents';
+import { useUserStore } from '../../src/store/userStore';
+import { Colors, Radius, Spacing, Typography, Gradients, Palette } from '../../src/theme';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const EVENT_CARD_WIDTH = SCREEN_WIDTH - Spacing.section * 2 - 28;
 const EVENT_IMAGE_FALLBACK = 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=800';
-const AnimatedPressable = Animated.createAnimatedComponent(TouchableOpacity);
-const AnimatedLayout = Animated.createAnimatedComponent(View);
-const AnimatedContent = Animated.createAnimatedComponent(View);
-
-function SpringCard({ children, style, onPress, delay = 0 }: any) {
-    const scale = useSharedValue(1);
-    const opacity = useSharedValue(1);
-
-    const animatedStyle = useAnimatedStyle(() => ({
-        transform: [{ scale: scale.value }],
-        opacity: opacity.value,
-    }));
-
-    return (
-        <AnimatedLayout layout={Layout.springify()} entering={FadeInDown.delay(delay).springify().damping(14)} style={style}>
-            <AnimatedPressable
-                activeOpacity={0.85}
-                onPressIn={() => {
-                    scale.value = withSpring(0.96, { damping: 12, stiffness: 250 });
-                    opacity.value = withSpring(0.95, { damping: 12, stiffness: 250 });
-                }}
-                onPressOut={() => {
-                    scale.value = withSpring(1, { damping: 14, stiffness: 230 });
-                    opacity.value = withSpring(1, { damping: 14, stiffness: 230 });
-                }}
-                onPress={onPress}
-                style={{ flex: 1 }}
-            >
-                <AnimatedContent style={[{ flex: 1 }, animatedStyle]}>{children}</AnimatedContent>
-            </AnimatedPressable>
-        </AnimatedLayout>
-    );
-}
 
 export default function ExploreScreen() {
-    const { clubs, events, user } = useHybridStore();
+    const { data: clubs = [], isLoading: clubsLoading } = useClubs();
+    const { data: events = [], isLoading: eventsLoading } = useEvents();
+    const { followedClubs } = useUserStore();
     const [searchQuery, setSearchQuery] = useState('');
     const [activeFilter, setActiveFilter] = useState('All');
 
-    const upcomingEvents = useMemo(
-        () =>
-            [...events]
+    const isLoading = clubsLoading || eventsLoading;
+
+    const upcomingEvents = useMemo(() => {
+        return [...events]
                 .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-                .slice(0, 6),
-        [events]
-    );
+                .slice(0, 6);
+    }, [events]);
 
-    const heroStats = useMemo(
-        () => [
-            { label: 'Clubs followed', value: user.followedClubs.length },
-            { label: 'Live events', value: events.length },
-            { label: 'Upcoming', value: Math.max(0, events.length) },
-        ],
-        [events.length, user.followedClubs.length]
-    );
+    const liveCount = events.length;
 
-    const popularClubs = clubs.slice(0, 4);
+    const popularClubs = clubs;
     const eventFilters = useMemo(() => {
         const cats = new Set<string>();
         events.forEach((event) => cats.add(event.category));
@@ -107,60 +64,54 @@ export default function ExploreScreen() {
         });
     }, [searchQuery, activeFilter, upcomingEvents]);
 
+    if (isLoading) {
+        return (
+            <SafeAreaView style={styles.safe} edges={['top']}>
+                <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                    <ActivityIndicator color={Colors.primary} size="large" />
+                </View>
+            </SafeAreaView>
+        );
+    }
+
     return (
         <SafeAreaView style={styles.safe} edges={['top']}>
-            <StatusBar barStyle="dark-content" />
-            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-                <View style={styles.heroWrapper}>
-                    <Card padding={0} radius={Radius.xxl} style={styles.heroCard} shadow="lg">
-                        <LinearGradient colors={['#F4FFF9', '#E0F7EB']} style={styles.heroGradient}>
-                            <View style={styles.heroTopRow}>
-                                <TouchableOpacity style={styles.heroBack}>
-                                    <Ionicons name="arrow-back" size={20} color={Colors.success} />
-                                </TouchableOpacity>
-                                <View style={styles.heroIconsRight}>
-                                    <TouchableOpacity style={styles.heroIconButton}>
-                                        <Ionicons name="heart-outline" size={18} color={Colors.textLight} />
-                                    </TouchableOpacity>
-                                    <TouchableOpacity style={styles.heroIconButton}>
-                                        <Ionicons name="ellipsis-horizontal" size={18} color={Colors.textLight} />
-                                    </TouchableOpacity>
-                                    <View style={styles.heroAvatarWrap}>
-                                        <Image
-                                            source={{ uri: 'https://i.pravatar.cc/150?img=58' }}
-                                            style={styles.heroAvatar}
-                                        />
-                                    </View>
-                                </View>
-                            </View>
-                            <Text style={styles.heroTitle}>Discover Campus</Text>
-                            <Text style={styles.heroSubtitle}>
-                                Clubs, live events, and curated spaces wrapped in a fresh, light green shell.
-                            </Text>
-                            <View style={styles.heroSearchRow}>
-                                <Ionicons name="search" size={18} color={Colors.success} />
-                                <TextInput
-                                    style={styles.searchInput}
-                                    placeholder="Search events, clubs, spaces"
-                                    placeholderTextColor="rgba(15,27,21,0.45)"
-                                    value={searchQuery}
-                                    onChangeText={setSearchQuery}
-                                />
-                                <TouchableOpacity>
-                                    <Ionicons name="options-outline" size={18} color={Colors.success} />
-                                </TouchableOpacity>
-                            </View>
-                            <View style={styles.heroStatsRow}>
-                                {heroStats.map((stat) => (
-                                    <View key={stat.label} style={styles.heroStat}>
-                                        <Text style={styles.heroStatValue}>{stat.value}</Text>
-                                        <Text style={styles.heroStatLabel}>{stat.label}</Text>
-                                    </View>
-                                ))}
-                            </View>
-                        </LinearGradient>
-                    </Card>
+            <StatusBar barStyle="light-content" />
+            
+            <View style={styles.header}>
+                <View>
+                    <Text style={styles.welcomeText}>What's happening,</Text>
+                    <Text style={styles.nameText}>Explore Campus</Text>
                 </View>
+                <TouchableOpacity style={styles.bellBtn} onPress={() => router.push('/notifications')}>
+                    <Ionicons name="notifications-outline" size={20} color={Colors.text} />
+                </TouchableOpacity>
+            </View>
+
+            <ScrollView 
+                showsVerticalScrollIndicator={false} 
+                contentContainerStyle={styles.scrollContent}
+                keyboardShouldPersistTaps="always"
+                stickyHeaderIndices={[1]}
+            >
+                <View style={styles.summaryWrap}>
+                    <View style={styles.summaryIconWrap}>
+                        <Ionicons name="sparkles" size={14} color={Colors.accent} />
+                    </View>
+                    <Text style={styles.summaryText}>
+                        Discover <Text style={styles.summaryHighlight}>{liveCount} live event{liveCount !== 1 ? 's' : ''}</Text> and <Text style={styles.summaryHighlight}>{clubs.length} clubs</Text> across campus today.
+                    </Text>
+                </View>
+
+                <View style={styles.searchContainerSticky}>
+                    <SearchBar
+                        placeholder="Search events, clubs, spaces..."
+                        value={searchQuery}
+                        onChangeText={setSearchQuery}
+                        onClear={() => setSearchQuery('')}
+                    />
+                </View>
+
                 <View style={styles.filterRow}>
                     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRowContent}>
                         {eventFilters.map((filter) => {
@@ -168,11 +119,14 @@ export default function ExploreScreen() {
                             return (
                                 <TouchableOpacity
                                     key={filter}
-                                    style={[styles.filterChip, isActive && styles.filterChipActive]}
+                                    style={[
+                                        styles.filterChip, 
+                                        isActive ? { backgroundColor: Colors.primary, borderColor: Colors.primary } : { backgroundColor: Colors.secondary, borderColor: Colors.border }
+                                    ]}
                                     onPress={() => setActiveFilter(filter)}
                                     activeOpacity={0.8}
                                 >
-                                    <Text style={[styles.filterChipText, isActive && styles.filterChipTextActive]}>
+                                    <Text style={[styles.filterChipText, isActive && styles.filterChipTextActive, !isActive && { color: Colors.mutedForeground }]}>
                                         {filter}
                                     </Text>
                                 </TouchableOpacity>
@@ -180,57 +134,49 @@ export default function ExploreScreen() {
                         })}
                     </ScrollView>
                 </View>
+
                 <View style={styles.sectionBlock}>
-                    <SectionHeader title="Popular" subtitle="Clubs" />
-                    <Card padding={0} style={styles.popularCard} shadow="sm">
-                        <View style={styles.popularCardContent}>
-                            <ScrollView
-                                horizontal
-                                showsHorizontalScrollIndicator={false}
-                                contentContainerStyle={styles.popularRow}
-                            >
-                                {popularClubs.map((club) => (
-                                    <TouchableOpacity
-                                        key={club.id}
-                                        style={styles.popularClubCard}
-                                        activeOpacity={0.85}
-                                        onPress={() => router.push(`/club/${club.id}`)}
-                                    >
+                    <View style={styles.sectionHeaderWrap}>
+                        <Text style={styles.sectionTitle}>Popular Clubs</Text>
+                    </View>
+                    <ScrollView
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        contentContainerStyle={styles.popularRow}
+                    >
+                        {popularClubs.map((club) => {
+                            return (
+                                <TouchableOpacity
+                                    key={club.id}
+                                    style={styles.popularClubCardWrap}
+                                    onPress={() => router.push(`/club/${club.id}`)}
+                                >
+                                    <View style={[styles.popularClubCard, { backgroundColor: Colors.card, borderColor: Colors.border }]}>
                                         <View style={styles.popularClubImageWrap}>
                                             <Image source={{ uri: club.logo }} style={styles.popularClubImage} />
                                         </View>
-                                        <Text style={styles.popularClubName} numberOfLines={1}>
+                                        <Text style={[styles.popularClubName, { color: Colors.foreground }]} numberOfLines={1}>
                                             {club.name}
                                         </Text>
-                                        <View style={styles.popularClubMeta}>
-                                            <Text style={styles.popularClubTag}>{club.tag ?? club.vibeTag ?? 'Community'}</Text>
-                                            <Text style={styles.popularClubFollowers}>{club.followersCount ?? 0} followers</Text>
-                                        </View>
-                                    </TouchableOpacity>
-                                ))}
-                            </ScrollView>
-                        </View>
-                    </Card>
+                                        <Text style={[styles.popularClubFollowers, { color: Colors.mutedForeground }]}>{club.followers_count ?? 0} followers</Text>
+                                    </View>
+                                </TouchableOpacity>
+                            );
+                        })}
+                    </ScrollView>
                 </View>
+
                 <View style={styles.sectionBlock}>
-                    <SectionHeader title="Recommended" subtitle="Live events" />
-                    <Card padding={0} style={styles.recommendedCard} shadow="sm">
-                        <View style={styles.recommendedCardContent}>
-                            <EventCarousel
-                                events={recommendedEvents}
-                                containerStyle={styles.cardCarouselContent}
-                                compact
-                            />
-                        </View>
-                    </Card>
+                    <View style={styles.sectionHeaderWrap}>
+                        <Text style={styles.sectionTitle}>Recommended Events</Text>
+                    </View>
+                    <EventCarousel events={recommendedEvents} />
                 </View>
+
                 <View style={styles.sectionBlock}>
-                    <SectionHeader title="Live & upcoming" subtitle="Swipe to preview" />
-                    <Card padding={0} style={styles.recommendedCard} shadow="sm">
-                        <View style={styles.recommendedCardContent}>
-                            <EventCarousel events={recommendedEvents} containerStyle={styles.cardCarouselContent} compact />
-                        </View>
-                    </Card>
+                    <View style={styles.sectionHeaderWrap}>
+                        <Text style={styles.sectionTitle}>Live & Upcoming</Text>
+                    </View>
                     <View style={styles.eventList}>
                         {recommendedEvents.slice(0, 4).map((eventItem) => (
                             <EventListItem key={eventItem.id} event={eventItem} />
@@ -240,368 +186,246 @@ export default function ExploreScreen() {
                         )}
                     </View>
                 </View>
+                <View style={{ height: 120 }} />
             </ScrollView>
         </SafeAreaView>
     );
 }
 
 function EventListItem({ event }: { event: any }) {
-    const catColor = Colors.accent;
     return (
         <TouchableOpacity
             style={styles.eventCardList}
             activeOpacity={0.85}
             onPress={() => event.id && router.push(`/event/${event.id}`)}
         >
-            <View style={styles.eventCardListContent}>
-                <View>
-                    <Text style={styles.eventListTitle}>{event.title}</Text>
-                    <Text style={styles.eventListMeta}>{event.time} · {event.location}</Text>
-                </View>
-                <TagPill label={event.category} variant="green" size="sm" />
+            <View style={[styles.listIconWrap, { backgroundColor: Colors.secondary }]}>
+                <Ionicons name="flash" size={18} color={Colors.primary} />
             </View>
+            <View style={{ flex: 1 }}>
+                <Text style={styles.eventListTitle}>{event.title}</Text>
+                <Text style={styles.eventListMeta}>{event.time} · {event.venue}</Text>
+            </View>
+            <TagPill label={event.category} variant="grey" size="sm" />
         </TouchableOpacity>
     );
 }
 
-function EventCarousel({ events, containerStyle, compact }: { events: any[]; containerStyle?: object; compact?: boolean }) {
-    if (!events.length) {
-        return null;
-    }
+function EventCarousel({ events }: { events: any[] }) {
+    if (!events.length) return null;
 
     return (
-        <View style={styles.eventCarousel}>
-            <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                snapToInterval={EVENT_CARD_WIDTH + Spacing.md}
-                decelerationRate="fast"
-                contentContainerStyle={[styles.eventCarouselContent, containerStyle]}
-            >
-                {events.map((event: any, index: number) => (
-                        <SpringCard
-                            key={event.id}
-                            delay={index * 30}
-                            style={[
-                                styles.eventCard,
-                                compact && styles.cardEventCard,
-                                { marginRight: index === events.length - 1 ? 0 : Spacing.md },
-                            ]}
+        <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            snapToInterval={EVENT_CARD_WIDTH + Spacing.md}
+            decelerationRate="fast"
+            contentContainerStyle={styles.eventCarouselContent}
+        >
+            {events.map((event: any) => {
+                return (
+                    <TouchableOpacity
+                        key={event.id}
+                        style={styles.eventCardWrap}
                         onPress={() => router.push(`/event/${event.id}` as any)}
                     >
-                        <Image source={{ uri: event.image || EVENT_IMAGE_FALLBACK }} style={styles.eventImage} />
-                        <LinearGradient colors={['rgba(7,27,14,0.8)', 'transparent']} style={styles.eventGradient} />
-                        <View style={styles.eventContent}>
-                            <TagPill label={event.category} variant="green" size="sm" />
-                            <Text style={styles.eventTitle}>{event.title}</Text>
-                            <Text style={styles.eventMeta}>
-                                {new Date(event.date).toLocaleDateString('en-US', {
-                                    weekday: 'short',
-                                    month: 'short',
-                                    day: 'numeric',
-                                })}{' '}
-                                · {event.time}
-                            </Text>
-                            <Text style={styles.eventVenue}>{event.location || event.venue}</Text>
+                        <View style={[styles.eventCard, { backgroundColor: Colors.card, borderColor: Colors.border }]}>
+                            <Image source={{ uri: event.image || event.media_assets?.[0] || EVENT_IMAGE_FALLBACK }} style={styles.eventImage} />
+                            <View style={styles.eventContent}>
+                                <View style={styles.eventCardTop}>
+                                    <TagPill label={event.category} variant="grey" size="sm" />
+                                    <Text style={[styles.eventCardTime, { color: Colors.mutedForeground }]}>{event.time}</Text>
+                                </View>
+                                <Text style={[styles.eventTitle, { color: Colors.foreground }]} numberOfLines={1}>{event.title}</Text>
+                                <View style={styles.eventCardFooter}>
+                                    <Ionicons name="location-outline" size={12} color={Colors.mutedForeground} />
+                                    <Text style={[styles.eventVenue, { color: Colors.mutedForeground }]} numberOfLines={1}>{event.venue}</Text>
+                                </View>
+                            </View>
                         </View>
-                    </SpringCard>
-                ))}
-            </ScrollView>
-        </View>
+                    </TouchableOpacity>
+                );
+            })}
+        </ScrollView>
     );
 }
 
 const styles = StyleSheet.create({
     safe: { flex: 1, backgroundColor: Colors.background },
+    header: { 
+        flexDirection: 'row', 
+        alignItems: 'center', 
+        justifyContent: 'space-between', 
+        paddingHorizontal: Spacing.section, 
+        paddingTop: Spacing.md, 
+        paddingBottom: Spacing.md, 
+        backgroundColor: Colors.background 
+    },
+    welcomeText: { ...Typography.caption, color: Colors.textSecondary },
+    nameText: { ...Typography.h2, color: Colors.text },
+    bellBtn: { 
+        width: 40, 
+        height: 40, 
+        borderRadius: Radius.md, 
+        backgroundColor: Colors.surface, 
+        alignItems: 'center', 
+        justifyContent: 'center',
+        borderWidth: 0.5,
+        borderColor: Colors.divider,
+    },
+    summaryWrap: { 
+        paddingHorizontal: Spacing.section, 
+        marginBottom: Spacing.sm, 
+        flexDirection: 'row', 
+        alignItems: 'center', 
+        gap: 10 
+    },
+    summaryIconWrap: { 
+        width: 24, 
+        height: 24, 
+        borderRadius: Radius.pill, 
+        backgroundColor: Colors.accentLight, 
+        alignItems: 'center', 
+        justifyContent: 'center' 
+    },
+    summaryText: { flex: 1, ...Typography.caption, color: Colors.textSecondary },
+    summaryHighlight: { color: Colors.text, fontFamily: 'Sora_700Bold' },
+    searchContainerSticky: { 
+        paddingHorizontal: Spacing.section, 
+        paddingVertical: Spacing.sm, 
+        backgroundColor: Colors.background, 
+        zIndex: 10 
+    },
     scrollContent: {
-        paddingBottom: Spacing.xxxl,
-        paddingTop: Spacing.md,
-        backgroundColor: Colors.background,
+        paddingBottom: 110,
     },
     filterRow: {
-        paddingHorizontal: Spacing.section,
-        marginBottom: Spacing.sm,
+        marginTop: Spacing.sm,
+        marginBottom: Spacing.md,
     },
     filterRowContent: {
-        paddingVertical: Spacing.xs,
+        paddingHorizontal: Spacing.section,
+        gap: Spacing.sm,
     },
     filterChip: {
-        paddingVertical: Spacing.xs,
-        paddingHorizontal: Spacing.lg,
-        borderRadius: Radius.xl,
-        borderWidth: 1,
+        paddingVertical: 8,
+        paddingHorizontal: 16,
+        borderRadius: Radius.pill,
+        borderWidth: 0.5,
         borderColor: Colors.divider,
-        marginRight: Spacing.sm,
-    },
-    filterChipActive: {
-        backgroundColor: Colors.success,
-        borderColor: Colors.success,
     },
     filterChipText: {
         ...Typography.caption,
-        color: Colors.textSecondary,
+        fontFamily: 'Sora_600SemiBold',
     },
     filterChipTextActive: {
-        color: '#fff',
-        fontWeight: '600' as const,
-    },
-    heroWrapper: {
-        paddingHorizontal: Spacing.section,
-        paddingTop: Spacing.sm,
-        paddingBottom: Spacing.md,
-    },
-    heroCard: {
-        borderRadius: Radius.xxl,
-        overflow: 'hidden',
-    },
-    heroGradient: {
-        padding: Spacing.lg,
-        minHeight: 260,
-        borderRadius: Radius.xxl,
-        justifyContent: 'space-between',
-        backgroundColor: Colors.surface,
-    },
-    heroTopRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-    },
-    heroBack: {
-        width: 42,
-        height: 42,
-        borderRadius: 14,
-        backgroundColor: 'rgba(10, 30, 18, 0.1)',
-        borderWidth: 1,
-        borderColor: 'rgba(15,27,21,0.15)',
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    heroIconsRight: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: Spacing.md,
-    },
-    heroIconButton: {
-        width: 36,
-        height: 36,
-        borderRadius: 12,
-        backgroundColor: 'rgba(10, 30, 18, 0.08)',
-        borderWidth: 1,
-        borderColor: 'rgba(15,27,21,0.18)',
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    heroAvatarWrap: {
-        width: 38,
-        height: 38,
-        borderRadius: 12,
-        borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.18)',
-        overflow: 'hidden',
-    },
-    heroAvatar: {
-        width: '100%',
-        height: '100%',
-    },
-    heroTitle: {
-        ...Typography.h2,
-        color: Colors.text,
-        marginTop: Spacing.md,
-    },
-    heroSubtitle: {
-        ...Typography.body2,
-        color: Colors.textSecondary,
-        marginTop: Spacing.xs,
-        lineHeight: 20,
-    },
-    heroSearchRow: {
-        marginTop: Spacing.md,
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: Spacing.sm,
-        backgroundColor: Colors.background,
-        borderRadius: Radius.xl,
-        borderWidth: 1,
-        borderColor: Colors.divider,
-        paddingHorizontal: Spacing.md,
-        paddingVertical: Spacing.sm,
-    },
-    searchInput: {
-        flex: 1,
-        ...Typography.body1,
-        color: Colors.text,
-        padding: 0,
-    },
-    heroStatsRow: {
-        marginTop: Spacing.md,
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-    },
-    heroStat: {
-        alignItems: 'flex-start',
-    },
-    heroStatValue: {
-        ...Typography.h4,
-        color: Colors.text,
-        fontSize: 18,
-    },
-    heroStatLabel: {
-        ...Typography.caption,
-        color: Colors.textSecondary,
-        marginTop: 2,
+        color: Colors.textLight,
+        fontFamily: 'Sora_700Bold',
     },
     sectionBlock: {
-        marginTop: Spacing.xl,
+        marginTop: Spacing.lg,
     },
-    popularCard: {
-        marginHorizontal: Spacing.section,
-        borderRadius: Radius.xxl,
-    },
-    popularCardContent: {
-        paddingTop: Spacing.sm,
-        paddingBottom: Spacing.sm,
-    },
+    sectionHeaderWrap: { paddingHorizontal: Spacing.section, marginBottom: Spacing.md },
+    sectionTitle: { ...Typography.h4, color: Colors.text },
     popularRow: {
-        paddingLeft: Spacing.md,
-        paddingRight: Spacing.section,
-        flexDirection: 'row',
+        paddingHorizontal: Spacing.section,
+        gap: Spacing.md,
     },
+    popularClubCardWrap: { width: 160, height: 120 },
     popularClubCard: {
-        width: 200,
-        borderRadius: Radius.xxl,
-        backgroundColor: Colors.surface,
-        padding: Spacing.md,
-        marginRight: Spacing.md,
-        borderWidth: 1,
-        borderColor: Colors.divider,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 6 },
-        shadowOpacity: 0.04,
-        shadowRadius: 12,
-        elevation: 3,
-    },
-    popularClubImageWrap: {
-        width: 52,
-        height: 52,
+        flex: 1,
         borderRadius: Radius.xl,
-        marginBottom: Spacing.sm,
+        padding: Spacing.md,
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: Colors.background,
+        borderWidth: 0.5,
+    },
+    popularClubImageWrap: {
+        width: 44,
+        height: 44,
+        borderRadius: Radius.md,
+        marginBottom: 8,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: 'rgba(255,255,255,0.1)',
     },
     popularClubImage: {
-        width: 48,
-        height: 48,
-        borderRadius: Radius.md,
-        resizeMode: 'cover',
+        width: 32,
+        height: 32,
+        borderRadius: Radius.sm,
     },
     popularClubName: {
-        ...Typography.body1,
-        color: Colors.text,
-        fontWeight: '600' as const,
-        marginBottom: Spacing.xs,
-    },
-    popularClubMeta: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-    },
-    popularClubTag: {
         ...Typography.caption,
-        color: Colors.textSecondary,
+        fontFamily: 'Sora_700Bold',
+        marginBottom: 2,
     },
     popularClubFollowers: {
-        ...Typography.caption,
-        color: Colors.textSecondary,
-    },
-    recommendedCard: {
-        marginHorizontal: Spacing.section,
-        borderRadius: Radius.xxl,
-        marginTop: Spacing.md,
-    },
-    recommendedCardContent: {
-        paddingBottom: Spacing.md,
-    },
-    cardCarouselContent: {
-        paddingHorizontal: Spacing.md,
-        alignItems: 'center',
-    },
-    eventCarousel: {
-        marginTop: Spacing.sm,
+        ...Typography.micro,
     },
     eventCarouselContent: {
-        paddingHorizontal: Spacing.md,
+        paddingHorizontal: Spacing.section,
+        gap: Spacing.md,
+    },
+    eventCardWrap: { width: 240, height: 180 },
+    eventCard: {
+        flex: 1,
+        borderRadius: Radius.xxl,
+        overflow: 'hidden',
+        borderWidth: 0.5,
+    },
+    eventImage: {
+        width: '100%',
+        height: 100,
+    },
+    eventContent: {
+        padding: Spacing.md,
+        gap: 4,
+    },
+    eventCardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+    eventCardTime: { ...Typography.micro, fontFamily: 'Sora_700Bold' },
+    eventTitle: {
+        ...Typography.body1,
+        fontFamily: 'Sora_700Bold',
+    },
+    eventCardFooter: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+    eventVenue: {
+        ...Typography.micro,
     },
     eventList: {
         paddingHorizontal: Spacing.section,
-        marginTop: Spacing.md,
+        gap: 12,
     },
     eventCardList: {
-        marginBottom: Spacing.sm,
-        borderRadius: Radius.xl,
-        borderWidth: 1,
-        borderColor: Colors.divider,
-        padding: Spacing.sm,
-        backgroundColor: Colors.surface,
-    },
-    eventCardListContent: {
         flexDirection: 'row',
-        justifyContent: 'space-between',
         alignItems: 'center',
-        gap: Spacing.sm,
+        gap: 12,
+        padding: 12,
+        borderRadius: Radius.lg,
+        backgroundColor: Colors.surface,
+        borderWidth: 0.5,
+        borderColor: Colors.divider,
+    },
+    listIconWrap: { 
+        width: 36, 
+        height: 36, 
+        borderRadius: Radius.md, 
+        alignItems: 'center', 
+        justifyContent: 'center', 
     },
     eventListTitle: {
-        ...Typography.body1,
+        ...Typography.h5,
+        fontSize: 13,
         color: Colors.text,
-        fontWeight: '600' as const,
     },
     eventListMeta: {
         ...Typography.caption,
         color: Colors.textSecondary,
+        marginTop: 2,
     },
     emptyState: {
         ...Typography.body2,
         color: Colors.textSecondary,
-        marginTop: Spacing.sm,
         textAlign: 'center',
-    },
-    eventCard: {
-        width: EVENT_CARD_WIDTH,
-        borderRadius: Radius.xxl,
-        overflow: 'hidden',
-        ...Shadows.md,
-        backgroundColor: '#F8FAF7',
-    },
-    cardEventCard: {
-        width: EVENT_CARD_WIDTH - 30,
-    },
-    eventImage: {
-        width: '100%',
-        height: 220,
-    },
-    eventGradient: {
-        ...StyleSheet.absoluteFillObject,
-        backgroundColor: 'transparent',
-    },
-    eventContent: {
-        position: 'absolute',
-        bottom: Spacing.md,
-        left: Spacing.md,
-        right: Spacing.md,
-        gap: Spacing.xs,
-    },
-    eventTitle: {
-        ...Typography.h3,
-        color: Colors.textLight,
-        lineHeight: 24,
-    },
-    eventMeta: {
-        ...Typography.caption,
-        color: Colors.textDimmed,
-    },
-    eventVenue: {
-        ...Typography.body2,
-        color: Colors.textLight,
-        fontWeight: '700' as const,
+        paddingVertical: 40,
     },
 });

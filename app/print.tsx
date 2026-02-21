@@ -8,7 +8,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Colors, Radius, Shadows, Spacing, Typography } from '../src/theme';
+import { Colors, Radius, Spacing, Typography } from '../src/theme';
 import { router } from 'expo-router';
 
 type Slot = {
@@ -38,8 +38,6 @@ const MOCK_DOCS: UploadedDoc[] = [
   { name: 'LabReport.pdf', size: 345_000 },
 ];
 
-const createQRCode = (prefix: string) => `${prefix}-${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
-
 export default function PrintRequestScreen() {
   const [document, setDocument] = useState<UploadedDoc | null>(null);
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
@@ -48,7 +46,6 @@ export default function PrintRequestScreen() {
   const slots = useMemo(() => generateTimeSlots(8, 18, 10), []);
 
   const handleUpload = () => {
-    // Cycle through mock documents to keep the UI interactive until a real picker is implemented.
     const nextIndex = document ? (MOCK_DOCS.findIndex((doc) => doc.name === document.name) + 1) % MOCK_DOCS.length : 0;
     setDocument(MOCK_DOCS[nextIndex]);
     setStatusMessage(null);
@@ -177,7 +174,6 @@ const styles = StyleSheet.create({
     borderRadius: Radius.xxl,
     padding: Spacing.lg,
     marginBottom: Spacing.lg,
-    ...Shadows.lg,
   },
   heroTitle: {
     ...Typography.h2,
@@ -195,7 +191,8 @@ const styles = StyleSheet.create({
     borderRadius: Radius.xl,
     padding: Spacing.lg,
     marginBottom: Spacing.lg,
-    ...Shadows.sm,
+    borderWidth: 0.5,
+    borderColor: Colors.divider,
   },
   sectionTitle: {
     ...Typography.h4,

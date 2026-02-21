@@ -5,13 +5,12 @@ import {
     View,
     ViewStyle,
 } from 'react-native';
-import { Colors, Radius, Shadows, Spacing } from '../../theme';
+import { Colors, Radius, Spacing } from '../../theme';
 
 interface CardProps {
     children: React.ReactNode;
     style?: ViewStyle;
     onPress?: () => void;
-    shadow?: 'xs' | 'sm' | 'md' | 'lg';
     padding?: number;
     radius?: number;
     dark?: boolean;
@@ -21,21 +20,19 @@ export default function Card({
     children,
     style,
     onPress,
-    shadow = 'sm',
     padding = Spacing.lg,
     radius = Radius.xl,   // bumped to 20 default
     dark = false,
 }: CardProps) {
-    const shadowStyle = Shadows[shadow];
     const base = {
         padding,
         borderRadius: radius,
         backgroundColor: dark ? Colors.darkBg : Colors.cardBg,
         // 1px highlight border on top for elevated feel (Apple-style)
         borderTopWidth: 1,
-        borderTopColor: dark ? Colors.highlight : 'rgba(0,0,0,0.04)',
+        borderTopColor: dark ? Colors.highlight : 'rgba(255,255,255,0.8)',
         borderWidth: dark ? 0 : 1,
-        borderColor: dark ? 'transparent' : Colors.border,
+        borderColor: dark ? 'transparent' : 'rgba(226, 232, 240, 0.4)', // More subtle border
     };
 
     if (onPress) {
@@ -43,7 +40,7 @@ export default function Card({
             <TouchableOpacity
                 activeOpacity={0.88}
                 onPress={onPress}
-                style={[styles.base, shadowStyle, base, style]}
+                style={[base, style]}
             >
                 {children}
             </TouchableOpacity>
@@ -51,12 +48,12 @@ export default function Card({
     }
 
     return (
-        <View style={[styles.base, shadowStyle, base, style]}>
+        <View style={[base, style]}>
             {children}
         </View>
     );
 }
 
 const styles = StyleSheet.create({
-    base: { overflow: 'hidden' },
+    base: {},
 });

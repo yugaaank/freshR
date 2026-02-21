@@ -16,11 +16,10 @@ export function useRestaurants() {
     });
 }
 
-export function useMenuItems(restaurantId: string, category?: string) {
+export function useMenuItems(restaurantId?: string, category?: string) {
     return useQuery({
-        queryKey: [...foodKeys.menu(restaurantId), category],
-        queryFn: () => getMenuItems(restaurantId, category),
-        enabled: !!restaurantId,
+        queryKey: [...(restaurantId ? foodKeys.menu(restaurantId) : ['menu', 'all']), category],
+        queryFn: () => getMenuItems(restaurantId || '', category),
         staleTime: 2 * 60_000,
     });
 }

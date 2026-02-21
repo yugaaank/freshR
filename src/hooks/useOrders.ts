@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import type { CartItemInput, Order } from '../lib/db/orders';
-import { getOrderById, getUserOrders, placeOrder, subscribeToOrderStatus } from '../lib/db/orders';
+import { getOrderById, getUserOrders, placeOrder, subscribeToOrderStatus, updateOrderStatus } from '../lib/db/orders';
 
 export const orderKeys = {
     all: (uid: string) => ['orders', uid] as const,
@@ -20,6 +20,18 @@ export function usePlaceOrder() {
         }) => placeOrder(vars.userId, vars.restaurantId, vars.items, vars.totalPrice),
         onSuccess: (_, { userId }) => {
             qc.invalidateQueries({ queryKey: orderKeys.all(userId) });
+        },
+    });
+}
+
+/** Update an existing order status */
+export function useUpdateOrderStatus() {
+    const qc = useQueryClient();
+    return useMutation({
+        mutationFn: (vars: { orderId: string; status: Order['status'] }) =>
+            updateOrderStatus(vars.orderId, vars.status),
+        onSuccess: (_, vars) => {
+            qc.invalidateQueries({ queryKey: orderKeys.detail(vars.orderId) });
         },
     });
 }

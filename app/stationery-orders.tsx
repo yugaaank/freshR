@@ -1,18 +1,27 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React from 'react';
-import { FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import Animated, { FadeInDown } from 'react-native-reanimated';
+import { ActivityIndicator, FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Colors, Radius, Shadows, Spacing, Typography } from '../src/theme';
-
-const PRINT_ORDERS = [
-  { id: 'p1', title: 'LabReport.pdf', status: 'Pending', slot: '09:40 AM', eta: 'Collect near stationery' },
-  { id: 'p2', title: 'Poster.pdf', status: 'Ready', slot: '12:20 PM', eta: 'Awaiting pickup' },
-  { id: 'p3', title: 'Resume.pdf', status: 'Collected', slot: 'Yesterday · 04:10 PM', eta: 'Thank you!' },
-];
+import { useUserPrintRequests } from '../src/hooks/usePrint';
+import { useUserStore } from '../src/store/userStore';
+import { Colors, Radius, Spacing, Typography } from '../src/theme';
+import dayjs from 'dayjs';
 
 export default function StationeryOrders() {
+  const { profile } = useUserStore();
+  const { data: requests = [], isLoading, error } = useUserPrintRequests(profile?.id ?? null);
+
+  if (isLoading) {
+    return (
+      <SafeAreaView style={styles.safe}>
+        <View style={styles.center}>
+          <ActivityIndicator size="large" color={Colors.primary} />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <View style={styles.header}>
@@ -22,19 +31,30 @@ export default function StationeryOrders() {
         <Text style={styles.title}>Stationery Requests</Text>
       </View>
       <FlatList
-        data={PRINT_ORDERS}
+        data={requests}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.list}
         renderItem={({ item }) => (
-          <Animated.View entering={FadeInDown.delay(60)} style={styles.card}>
+          <View style={styles.card}>
             <View style={styles.cardTop}>
-              <Text style={styles.cardTitle}>{item.title}</Text>
-              <Text style={[styles.status, item.status === 'Ready' ? styles.statusReady : item.status === 'Collected' ? styles.statusCollected : styles.statusPending]}> {item.status}</Text>
+              <Text style={styles.cardTitle}>{item.file_name}</Text>
+              <Text style={[styles.status, item.status === 'ready' ? styles.statusReady : item.status === 'collected' ? styles.statusCollected : styles.statusPending]}>
+                {item.status.toUpperCase()}
+              </Text>
             </View>
-            <Text style={styles.cardMeta}>Slot: {item.slot}</Text>
-            <Text style={styles.cardMeta}>{item.eta}</Text>
-          </Animated.View>
+            <View style={styles.cardRow}>
+               <Text style={styles.cardMeta}>Pickup: {dayjs(item.scheduled_time).format('h:mm A')}</Text>
+               <Text style={styles.cardMeta}>{item.pages} pgs · {item.copies} copies</Text>
+            </View>
+            <Text style={styles.cardMeta}>{item.pickup_code ? `Code: ${item.pickup_code}` : 'Awaiting code...'}</Text>
+          </View>
         )}
+        ListEmptyComponent={
+          <View style={styles.emptyContainer}>
+            <Ionicons name="print-outline" size={48} color={Colors.border} />
+            <Text style={styles.empty}>No stationery requests found.</Text>
+          </View>
+        }
         ListFooterComponent={<View style={{ height: 120 }} />}
       />
     </SafeAreaView>
@@ -43,6 +63,7 @@ export default function StationeryOrders() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.background },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -62,10 +83,11 @@ const styles = StyleSheet.create({
     gap: Spacing.sm,
   },
   card: {
-    backgroundColor: Colors.cardBg,
+    backgroundColor: Colors.surface,
     borderRadius: Radius.xl,
     padding: Spacing.md,
-    ...Shadows.sm,
+    borderWidth: 0.5,
+    borderColor: Colors.divider,
   },
   cardTop: {
     flexDirection: 'row',
@@ -75,8 +97,11 @@ const styles = StyleSheet.create({
   },
   cardTitle: { ...Typography.h5, color: Colors.text },
   cardMeta: { ...Typography.body2, color: Colors.textSecondary },
-  status: { ...Typography.caption, paddingVertical: 2, paddingHorizontal: Spacing.sm, borderRadius: Radius.pill, fontSize: 11 },
+  cardRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 },
+  status: { ...Typography.caption, paddingVertical: 2, paddingHorizontal: Spacing.sm, borderRadius: Radius.pill, fontSize: 10, fontWeight: '700' },
   statusPending: { backgroundColor: Colors.warningLight, color: Colors.warning },
   statusReady: { backgroundColor: Colors.successLight, color: Colors.success },
-  statusCollected: { backgroundColor: Colors.surface, color: Colors.textSecondary },
+  statusCollected: { backgroundColor: Colors.divider, color: Colors.textSecondary },
+  emptyContainer: { alignItems: 'center', justifyContent: 'center', marginTop: 100, opacity: 0.5 },
+  empty: { marginTop: Spacing.sm, textAlign: 'center', color: Colors.textSecondary },
 });

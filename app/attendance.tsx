@@ -1,62 +1,97 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React from 'react';
-import { FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import Animated, { FadeInDown } from 'react-native-reanimated';
+import { FlatList, StyleSheet, Text, TouchableOpacity, View, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Colors, Radius, Shadows, Spacing, Typography } from '../src/theme';
-
-const ATTENDANCE_DATA = [
-  { id: 'a1', course: 'Advanced React Native', attendance: 92, status: 'Good' },
-  { id: 'a2', course: 'AI Lab', attendance: 88, status: 'Good' },
-  { id: 'a3', course: 'Data Structures', attendance: 84, status: 'Fair' },
-  { id: 'a4', course: 'Web Systems', attendance: 73, status: 'Needs attention' },
-];
+import { useSubjects } from '../src/hooks/useAcademics';
+import { useUserStore } from '../src/store/userStore';
+import { Colors, Radius, Spacing, Typography } from '../src/theme';
 
 export default function AttendanceScreen() {
+  const { profile } = useUserStore();
+  const { data: subjects = [], isLoading } = useSubjects(profile?.id ?? null);
+
+  const renderItem = ({ item }: { item: any }) => {
+    const status = item.attendance >= 85 ? 'Excellent' : item.attendance >= 75 ? 'Good' : 'At Risk';
+    const statusColor = item.attendance >= 85 ? '#39d353' : item.attendance >= 75 ? '#26a641' : '#006d21';
+    const statusBg = statusColor + '20';
+    const isHighAttendance = item.attendance >= 85;
+
+    return (
+      <View 
+        style={[
+          styles.card, 
+          { backgroundColor: Colors.card, borderColor: Colors.border, borderWidth: 0.5 },
+          isHighAttendance && { borderColor: '#26a641' }
+        ]}
+      >
+        <View style={styles.cardTop}>
+          <Text style={styles.cardTitle}>{item.name}</Text>
+          <View style={[styles.badge, { backgroundColor: statusBg }]}>
+            <Text style={[styles.badgeText, { color: statusColor }]}>{status}</Text>
+          </View>
+        </View>
+        <View style={styles.metaRow}>
+          <Text style={[styles.cardMeta, { color: Colors.foreground }]}>{item.attendance}% attendance</Text>
+          <Text style={styles.nextClass}>Next: {item.next_class || 'TBD'}</Text>
+        </View>
+        <View style={styles.progressBar}>
+          <View style={[styles.progressFill, { width: `${item.attendance}%`, backgroundColor: statusColor }]} />
+        </View>
+      </View>
+    );
+  };
+
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.back}>
-          <Ionicons name="chevron-back" size={20} color={Colors.text} />
+          <Ionicons name="chevron-back" size={24} color={Colors.text} />
         </TouchableOpacity>
         <Text style={styles.title}>Attendance</Text>
       </View>
-      <FlatList
-        data={ATTENDANCE_DATA}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.list}
-        renderItem={({ item }) => (
-          <Animated.View entering={FadeInDown.delay(50)} style={styles.card}>
-            <View style={styles.cardTop}>
-              <Text style={styles.cardTitle}>{item.course}</Text>
-              <View style={styles.badge}>
-                <Text style={styles.badgeText}>{item.status}</Text>
-              </View>
-            </View>
-            <Text style={styles.cardMeta}>{item.attendance}% attendance</Text>
-            <View style={styles.progressBar}>
-              <View style={[styles.progressFill, { width: `${item.attendance}%` }]} />
-            </View>
-          </Animated.View>
-        )}
-        ListFooterComponent={() => <View style={{ height: 100 }} />}
-      />
+      
+      {isLoading ? (
+        <View style={styles.center}>
+          <ActivityIndicator size="large" color={Colors.primary} />
+        </View>
+      ) : (
+        <FlatList
+          data={subjects}
+          keyExtractor={(item) => item.subject_id}
+          contentContainerStyle={styles.list}
+          renderItem={renderItem}
+          ListEmptyComponent={
+            <Text style={styles.empty}>No attendance records found.</Text>
+          }
+          ListFooterComponent={() => <View style={{ height: 100 }} />}
+        />
+      )}
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.background },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: Spacing.section,
+    backgroundColor: Colors.background,
     borderBottomWidth: 1,
-    borderColor: Colors.border,
+    borderColor: Colors.divider,
   },
   back: {
+    width: 40,
+    height: 40,
+    borderRadius: Radius.md,
+    backgroundColor: Colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
     marginRight: Spacing.md,
+    borderWidth: 0.5,
+    borderColor: Colors.divider,
   },
   title: {
     ...Typography.h3,
@@ -64,47 +99,65 @@ const styles = StyleSheet.create({
   },
   list: {
     padding: Spacing.section,
-    gap: Spacing.sm,
+    gap: Spacing.md,
   },
   card: {
-    backgroundColor: Colors.cardBg,
+    backgroundColor: Colors.surface,
     borderRadius: Radius.xl,
-    padding: Spacing.md,
-    ...Shadows.sm,
+    padding: Spacing.lg,
+    borderWidth: 0.5,
+    borderColor: Colors.divider,
   },
   cardTop: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     marginBottom: Spacing.sm,
+    gap: 10,
   },
   cardTitle: {
     ...Typography.h5,
     color: Colors.text,
+    flex: 1,
   },
   badge: {
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: 2,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
     borderRadius: Radius.pill,
-    backgroundColor: Colors.accentLight,
   },
   badgeText: {
-    ...Typography.caption,
-    color: Colors.accent,
+    ...Typography.micro,
+    fontFamily: 'Sora_700Bold',
+    textTransform: 'uppercase',
+  },
+  metaRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: Spacing.md,
   },
   cardMeta: {
-    ...Typography.body2,
-    color: Colors.textSecondary,
-    marginBottom: Spacing.sm,
+    ...Typography.caption,
+    fontFamily: 'Sora_600SemiBold',
+  },
+  nextClass: {
+    ...Typography.micro,
+    color: Colors.textTertiary,
   },
   progressBar: {
-    height: 6,
-    borderRadius: Radius.md,
-    backgroundColor: Colors.sectionBg,
+    height: 8,
+    borderRadius: Radius.pill,
+    backgroundColor: Colors.divider,
     overflow: 'hidden',
   },
   progressFill: {
     height: '100%',
-    backgroundColor: Colors.primary,
+    borderRadius: Radius.pill,
+  },
+  empty: {
+    textAlign: 'center',
+    marginTop: 40,
+    ...Typography.body1,
+    color: Colors.textSecondary,
   },
 });

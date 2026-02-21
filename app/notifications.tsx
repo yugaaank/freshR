@@ -2,123 +2,40 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React from 'react';
 import {
+    ActivityIndicator,
     Dimensions,
-    Pressable,
+    ScrollView,
     StyleSheet,
     Text,
     TouchableOpacity,
     View
 } from 'react-native';
-import Animated, {
-    FadeInDown,
-    Layout,
-    useAnimatedStyle,
-    useSharedValue,
-    withSpring,
-} from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import TagPill from '../src/components/ui/TagPill';
-import { Colors, Radius, Shadows, Spacing, Typography } from '../src/theme';
+import { useCampusAlerts } from '../src/hooks/useCampusAlerts';
+import { Colors, Radius, Spacing, Typography } from '../src/theme';
+import dayjs from 'dayjs';
+import relativeTime from 'dayjs/plugin/relativeTime';
+
+dayjs.extend(relativeTime);
 
 const { width: SW } = Dimensions.get('window');
 
-const NOTIFICATIONS = [
-    {
-        id: 'n1',
-        type: 'assignment',
-        title: 'Pending Assignment',
-        desc: 'Database Systems Lab 4 is due in 3 hours.',
-        time: '2 hours ago',
-        icon: 'document-text',
-        color: Colors.errorLight,
-        iconColor: Colors.error,
-        tag: 'Urgent'
-    },
-    {
-        id: 'n2',
-        type: 'result',
-        title: 'Results Announced',
-        desc: 'Mid-term results for Compiler Design are out. Tap to view your score.',
-        time: '5 hours ago',
-        icon: 'school',
-        color: Colors.successLight,
-        iconColor: Colors.success,
-        tag: 'Academic'
-    },
-    {
-        id: 'n3',
-        type: 'maintenance',
-        title: 'Server Maintenance',
-        desc: 'The campus WiFi will be under maintenance tonight from 2 AM to 4 AM.',
-        time: 'Yesterday',
-        icon: 'construct',
-        color: '#FFF8F0',
-        iconColor: '#FF6B35',
-        tag: 'Campus'
-    },
-    {
-        id: 'n4',
-        type: 'event',
-        title: 'Event Registration Closing',
-        desc: 'Last chance to register for the Annual Hackathon. Only 5 slots left.',
-        time: 'Yesterday',
-        icon: 'calendar',
-        color: '#F0FAFB',
-        iconColor: '#0891B2',
-        tag: 'Event'
-    }
-];
+export default function NotificationsScreen() {
+    const { data: alerts = [], isLoading } = useCampusAlerts();
 
-const AnimatedLayout = Animated.createAnimatedComponent(View);
-const AnimatedContent = Animated.createAnimatedComponent(View);
-
-function SpringCard({ children, style, onPress, delay = 0 }: any) {
-    const scale = useSharedValue(1);
-    const opacity = useSharedValue(1);
-
-    const animatedStyle = useAnimatedStyle(() => ({
-        transform: [{ scale: scale.value }],
-        opacity: opacity.value
-    }));
-
-    const content = (
-        <AnimatedContent style={[{ flex: 1 }, animatedStyle]}>
-            {children}
-        </AnimatedContent>
-    );
-
-    if (!onPress) {
+    if (isLoading) {
         return (
-            <AnimatedLayout layout={Layout.springify()} entering={FadeInDown.delay(delay).springify().damping(14)} style={style}>
-                {content}
-            </AnimatedLayout>
+            <SafeAreaView style={styles.safe}>
+                <View style={styles.center}>
+                    <ActivityIndicator size="large" color={Colors.primary} />
+                </View>
+            </SafeAreaView>
         );
     }
 
     return (
-        <AnimatedLayout layout={Layout.springify()} entering={FadeInDown.delay(delay).springify().damping(14)} style={style}>
-            <Pressable
-                onPressIn={() => {
-                    scale.value = withSpring(0.95, { damping: 12, stiffness: 250 });
-                    opacity.value = withSpring(0.9, { damping: 12, stiffness: 250 });
-                }}
-                onPressOut={() => {
-                    scale.value = withSpring(1, { damping: 14, stiffness: 200 });
-                    opacity.value = withSpring(1, { damping: 14, stiffness: 200 });
-                }}
-                onPress={onPress}
-                style={{ flex: 1 }}
-            >
-                {content}
-            </Pressable>
-        </AnimatedLayout>
-    );
-}
-
-export default function NotificationsScreen() {
-    return (
         <SafeAreaView style={styles.safe}>
-            {/* HEADER */}
             <View style={styles.header}>
                 <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
                     <Ionicons name="arrow-back" size={24} color={Colors.text} />
@@ -127,36 +44,38 @@ export default function NotificationsScreen() {
                 <View style={styles.headerRight} />
             </View>
 
-            <Animated.ScrollView
+            <ScrollView
                 showsVerticalScrollIndicator={false}
                 contentContainerStyle={styles.scroll}
             >
-                {NOTIFICATIONS.map((notif, idx) => (
-                    <SpringCard key={notif.id} delay={100 + idx * 50} style={styles.notifCardWrap} onPress={() => { }}>
-                        <View style={styles.notifCard}>
-                            <View style={[styles.iconWrap, { backgroundColor: notif.color }]}>
-                                <Ionicons name={notif.icon as any} size={24} color={notif.iconColor} />
-                            </View>
-                            <View style={styles.notifContent}>
-                                <View style={styles.titleRow}>
-                                    <Text style={styles.title}>{notif.title}</Text>
-                                    <Text style={styles.time}>{notif.time}</Text>
+                {alerts.map((notif) => {
+                    return (
+                        <TouchableOpacity key={notif.id} style={[styles.notifCardWrap, { backgroundColor: Colors.card, borderColor: Colors.border, borderWidth: 0.5 }]} onPress={() => { }}>
+                            <View style={styles.notifCard}>
+                                <View style={[styles.iconWrap, { backgroundColor: Colors.secondary }]}>
+                                    <Text style={{fontSize: 24}}>{notif.emoji}</Text>
                                 </View>
-                                <Text style={styles.desc}>{notif.desc}</Text>
+                                <View style={styles.notifContent}>
+                                    <View style={styles.titleRow}>
+                                        <Text style={[styles.title, { color: Colors.foreground }]}>{notif.title}</Text>
+                                        <Text style={[styles.time, { color: Colors.mutedForeground }]}>{dayjs(notif.created_at).fromNow()}</Text>
+                                    </View>
+                                    <Text style={[styles.desc, { color: Colors.mutedForeground }]}>{notif.description}</Text>
 
-                                <View style={styles.tagRow}>
-                                    <TagPill label={notif.tag} variant={notif.type === 'assignment' ? 'red' : notif.type === 'result' ? 'green' : notif.type === 'maintenance' ? 'orange' : 'teal'} size="sm" />
+                                    <View style={styles.tagRow}>
+                                        <TagPill label={notif.type.toUpperCase()} variant="grey" size="sm" />
+                                    </View>
                                 </View>
                             </View>
-                        </View>
-                    </SpringCard>
-                ))}
+                        </TouchableOpacity>
+                    );
+                })}
 
                 <View style={styles.emptyState}>
                     <Ionicons name="checkmark-done-circle-outline" size={48} color={Colors.border} />
                     <Text style={styles.emptyText}>You're all caught up!</Text>
                 </View>
-            </Animated.ScrollView>
+            </ScrollView>
         </SafeAreaView>
     );
 }
@@ -164,27 +83,28 @@ export default function NotificationsScreen() {
 const styles = StyleSheet.create({
     safe: {
         flex: 1,
-        backgroundColor: '#FAFAFA',
+        backgroundColor: Colors.background,
     },
+    center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
     header: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
         paddingHorizontal: Spacing.section,
         paddingVertical: Spacing.md,
-        backgroundColor: '#FFF',
+        backgroundColor: Colors.background,
         borderBottomWidth: 1,
-        borderBottomColor: Colors.border,
+        borderBottomColor: Colors.divider,
     },
     backBtn: {
         width: 40,
         height: 40,
-        borderRadius: 20,
+        borderRadius: Radius.md,
         alignItems: 'center',
         justifyContent: 'center',
         backgroundColor: Colors.surface,
-        ...Shadows.sm,
-        shadowOpacity: 0.05,
+        borderWidth: 0.5,
+        borderColor: Colors.divider,
     },
     headerTitle: {
         ...Typography.h3,
@@ -200,9 +120,7 @@ const styles = StyleSheet.create({
     },
     notifCardWrap: {
         borderRadius: Radius.xl,
-        backgroundColor: '#FFF',
-        ...Shadows.sm,
-        shadowOpacity: 0.04,
+        backgroundColor: Colors.cardBg,
     },
     notifCard: {
         flexDirection: 'row',
@@ -212,7 +130,7 @@ const styles = StyleSheet.create({
     iconWrap: {
         width: 48,
         height: 48,
-        borderRadius: 24,
+        borderRadius: Radius.lg,
         alignItems: 'center',
         justifyContent: 'center',
     },

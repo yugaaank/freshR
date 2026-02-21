@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Card from '../src/components/ui/Card';
-import { useOrderStatus } from '../src/hooks/useOrders';
+import { useOrderStatus, useUpdateOrderStatus } from '../src/hooks/useOrders';
 import { useCartStore } from '../src/store/cartStore';
 import { Colors, Radius, Spacing, Typography } from '../src/theme';
 
@@ -36,10 +36,31 @@ export default function OrderTrackingScreen() {
     const items = useCartStore((s) => s.items);
     const totalPrice = useCartStore((s) => s.totalPrice());
     const clearCart = useCartStore((s) => s.clearCart);
+    const clearActiveOrder = useCartStore((s) => s.clearActiveOrder);
 
     // Real-time order status from Supabase
     const liveStatus = useOrderStatus(routeOrderId ?? null);
+    const updateStatus = useUpdateOrderStatus();
     const currentStep = liveStatus ? (STATUS_STEP[liveStatus] ?? 1) : 2;
+
+    const isDelivered = liveStatus === 'delivered' || (routeOrderId === undefined && currentStep === 4);
+
+    const handleOrderScanned = () => {
+        if (routeOrderId) {
+            updateStatus.mutate({ orderId: routeOrderId, status: 'delivered' });
+        } else {
+            // Simulation fallback
+            clearActiveOrder();
+            router.replace('/(tabs)/food');
+        }
+    };
+
+    // Clear banner if delivered
+    useEffect(() => {
+        if (liveStatus === 'delivered') {
+            clearActiveOrder();
+        }
+    }, [liveStatus]);
 
     // Fallback simulated progress when no real order is tracked
     const [simStep, setSimStep] = useState(2);
@@ -48,6 +69,10 @@ export default function OrderTrackingScreen() {
         const timers = [
             setTimeout(() => setSimStep(2), 3000),
             setTimeout(() => setSimStep(3), 8000),
+            setTimeout(() => {
+                setSimStep(4);
+                clearActiveOrder();
+            }, 12000),
         ];
         return () => timers.forEach(clearTimeout);
     }, [routeOrderId]);
@@ -158,9 +183,26 @@ export default function OrderTrackingScreen() {
                     </View>
                 </Card>
 
+                {!isDelivered && (
+                    <TouchableOpacity
+                        style={[styles.scannedBtn, updateStatus.isPending && styles.btnDisabled]}
+                        onPress={handleOrderScanned}
+                        disabled={updateStatus.isPending}
+                    >
+                        <Ionicons name="qr-code-outline" size={20} color="#FFF" />
+                        <Text style={styles.scannedBtnText}>
+                            {updateStatus.isPending ? 'Updating...' : 'Order Scanned'}
+                        </Text>
+                    </TouchableOpacity>
+                )}
+
                 <TouchableOpacity
                     style={styles.reorderBtn}
-                    onPress={() => { clearCart(); router.replace('/(tabs)/food'); }}
+                    onPress={() => { 
+                        clearCart(); 
+                        clearActiveOrder();
+                        router.replace('/(tabs)/food'); 
+                    }}
                 >
                     <Text style={styles.reorderText}>Order Again</Text>
                 </TouchableOpacity>
@@ -182,7 +224,7 @@ const styles = StyleSheet.create({
         borderBottomColor: Colors.border,
     },
     headerTitle: { ...Typography.h3, color: Colors.text },
-    scroll: { padding: Spacing.lg, gap: Spacing.md },
+    scroll: { padding: Spacing.lg, gap: Spacing.md, paddingBottom: 40 },
     statusHero: { marginBottom: 0 },
     statusTop: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, marginBottom: Spacing.md },
     statusIcon: {
@@ -234,11 +276,24 @@ const styles = StyleSheet.create({
     summaryTotal: { ...Typography.h5, color: Colors.text },
     summaryTotalPrice: { ...Typography.price, color: Colors.text },
     reorderBtn: {
-        backgroundColor: Colors.primary,
+        backgroundColor: Colors.surface,
         borderRadius: Radius.md,
         paddingVertical: Spacing.md,
         alignItems: 'center',
         marginTop: Spacing.xs,
+        borderWidth: 1,
+        borderColor: Colors.divider,
     },
-    reorderText: { ...Typography.h5, color: '#FFF', fontWeight: '700' },
+    reorderText: { ...Typography.h5, color: Colors.text, fontWeight: '700' },
+    scannedBtn: {
+        backgroundColor: Colors.primary,
+        borderRadius: Radius.md,
+        paddingVertical: Spacing.md,
+        alignItems: 'center',
+        flexDirection: 'row',
+        justifyContent: 'center',
+        gap: 8,
+    },
+    scannedBtnText: { ...Typography.h5, color: '#FFF', fontWeight: '700' },
+    btnDisabled: { opacity: 0.6 },
 });

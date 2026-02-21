@@ -1,96 +1,100 @@
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
-import { router } from 'expo-router';
-import React, { useState } from 'react';
+import { router, useLocalSearchParams } from 'expo-router';
+import React, { useState, useEffect, useRef } from 'react';
 import {
     FlatList,
     StyleSheet,
     Text,
     TouchableOpacity,
     View,
+    Dimensions,
 } from 'react-native';
-import Animated, { Easing, useAnimatedStyle, useSharedValue, withRepeat, withTiming } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import Svg, { Defs, LinearGradient as SvgLinearGradient, Rect, Stop } from 'react-native-svg';
-import TagPill from '../src/components/ui/TagPill';
-import { Colors, Radius, Shadows, Spacing, Typography } from '../src/theme';
+import Svg, { Line, Circle } from 'react-native-svg';
+import { Colors, Radius, Spacing, Typography } from '../src/theme';
+import { useLandmarks } from '../src/hooks/useLandmarks';
 
-const LANDMARKS = [
-    { id: 'l1', name: 'Main Library', category: 'Academic', floor: 'Ground + 3 floors', distance: '200m', icon: '📚', color: Colors.tagBlue, available: true, opens: '8 AM–10 PM' },
-    { id: 'l2', name: 'Canteen Central', category: 'Food', floor: 'Ground Floor', distance: '50m', icon: '🍽️', color: Colors.tagOrange, available: true, opens: '7 AM–10 PM' },
-    { id: 'l3', name: 'Sports Complex', category: 'Sports', floor: 'Ground + 2 floors', distance: '500m', icon: '⚽', color: Colors.tagGreen, available: true, opens: '6 AM–9 PM' },
-    { id: 'l4', name: 'Innovation Hub', category: 'Tech', floor: 'Level 2', distance: '300m', icon: '💡', color: Colors.tagPurple, available: true, opens: '9 AM–8 PM' },
-    { id: 'l5', name: 'Medical Centre', category: 'Health', floor: 'Ground Floor', distance: '150m', icon: '🏥', color: Colors.tagRed, available: false, opens: 'Closed now' },
-    { id: 'l6', name: 'Auditorium A', category: 'Events', floor: 'Ground Floor', distance: '400m', icon: '🎭', color: Colors.tagPurple, available: true, opens: '8 AM–11 PM' },
-    { id: 'l7', name: 'ATM & Bank', category: 'Finance', floor: 'Admin Block', distance: '250m', icon: '🏦', color: Colors.tagGreen, available: true, opens: '24/7' },
-    { id: 'l8', name: 'Girls Hostel A', category: 'Hostel', floor: 'Block A', distance: '700m', icon: '🏠', color: Colors.tagBlue, available: true, opens: 'Check-in 24/7' },
-];
+const { width: SW } = Dimensions.get('window');
 
-function AnimatedGradientBorder() {
-    const rotation = useSharedValue(0);
+function MockMapView({ activeLandmark, showRoute, landmarks }: { activeLandmark: string | null, showRoute: boolean, landmarks: any[] }) {
+    // Map live landmarks to mock coordinates for the visual map
+    const visualSlots = [
+        { x: 55, y: 10, w: 30, h: 25 }, // l1
+        { x: 10, y: 45, w: 20, h: 15 }, // l2
+        { x: 15, y: 68, w: 30, h: 18 }, // l3
+        { x: 40, y: 40, w: 25, h: 20 }, // l4
+        { x: 70, y: 45, w: 20, h: 20 }, // l5
+        { x: 55, y: 68, w: 35, h: 18 }, // l6
+        { x: 10, y: 15, w: 35, h: 20 }, // l7
+    ];
 
-    React.useEffect(() => {
-        rotation.value = withRepeat(
-            withTiming(360, { duration: 3000, easing: Easing.linear }),
-            -1
-        );
-    }, [rotation]);
-
-    const animatedStyle = useAnimatedStyle(() => ({
-        transform: [{ rotate: `${rotation.value}deg` }],
+    const mapBuildings = landmarks.slice(0, 7).map((l, i) => ({
+        ...l,
+        x: visualSlots[i]?.x ?? 50,
+        y: visualSlots[i]?.y ?? 50,
+        w: visualSlots[i]?.w ?? 10,
+        h: visualSlots[i]?.h ?? 10,
+        label: l.name.split(' ')[0]
     }));
 
-    return (
-        <View style={[StyleSheet.absoluteFill, { borderRadius: Radius.lg, overflow: 'hidden' }]}>
-            <Animated.View style={[{ position: 'absolute', width: '200%', height: '200%', left: '-50%', top: '-50%' }, animatedStyle]}>
-                <Svg width="100%" height="100%">
-                    <Defs>
-                        <SvgLinearGradient id="grad" x1="0" y1="0" x2="1" y2="1">
-                            <Stop offset="0" stopColor={Colors.primary} stopOpacity="1" />
-                            <Stop offset="0.5" stopColor={Colors.primary} stopOpacity="0" />
-                            <Stop offset="1" stopColor={Colors.primary} stopOpacity="1" />
-                        </SvgLinearGradient>
-                    </Defs>
-                    <Rect width="100%" height="100%" fill="url(#grad)" />
-                </Svg>
-            </Animated.View>
-            <View style={{ position: 'absolute', top: 2, left: 2, right: 2, bottom: 2, backgroundColor: Colors.cardBg, borderRadius: Radius.lg - 2 }} />
-        </View>
-    );
-}
-
-// Mock map tiles to simulate a campus map
-function MockMapView({ activeLandmark }: { activeLandmark: string | null }) {
-    const mockBuildings = [
-        { x: '10%', y: '15%', w: '35%', h: '20%', color: '#E8F0FE', label: 'CS Block' },
-        { x: '55%', y: '10%', w: '30%', h: '25%', color: '#E8F7EF', label: 'Library' },
-        { x: '10%', y: '45%', w: '20%', h: '15%', color: '#FFF3E8', label: 'Canteen' },
-        { x: '40%', y: '40%', w: '25%', h: '20%', color: '#F3E8FF', label: 'Innovation Hub' },
-        { x: '70%', y: '45%', w: '20%', h: '20%', color: '#FDECEA', label: 'Medical' },
-        { x: '15%', y: '68%', w: '30%', h: '18%', color: '#E8F7EF', label: 'Sports Complex' },
-        { x: '55%', y: '68%', w: '35%', h: '18%', color: '#E8F0FE', label: 'Auditorium' },
-    ];
+    const userPos = { x: 45, y: 50 };
+    const targetBuilding = mapBuildings.find(b => b.id === activeLandmark);
 
     return (
         <View style={mapStyles.container}>
             {/* Roads */}
-            <View style={[mapStyles.roadH, { top: '38%' }]} />
-            <View style={[mapStyles.roadH, { top: '62%' }]} />
-            <View style={[mapStyles.roadV, { left: '38%' }]} />
-            <View style={[mapStyles.roadV, { left: '68%' }]} />
+            <View style={[mapStyles.roadH, { top: '38%', backgroundColor: '#E2E8F0', height: 12 }]} />
+            <View style={[mapStyles.roadH, { top: '62%', backgroundColor: '#E2E8F0', height: 12 }]} />
+            <View style={[mapStyles.roadV, { left: '38%', backgroundColor: '#E2E8F0', width: 12 }]} />
+            <View style={[mapStyles.roadV, { left: '68%', backgroundColor: '#E2E8F0', width: 12 }]} />
 
             {/* Buildings */}
-            {mockBuildings.map((b) => (
-                <View
-                    key={b.label}
-                    style={[mapStyles.building, { left: b.x as any, top: b.y as any, width: b.w as any, height: b.h as any, backgroundColor: b.color }]}
-                >
-                    <Text style={mapStyles.buildingLabel} numberOfLines={1}>{b.label}</Text>
-                </View>
-            ))}
+            {mapBuildings.map((b) => {
+                const isActive = activeLandmark === b.id;
+                return (
+                    <View
+                        key={b.id}
+                        style={[
+                            mapStyles.building, 
+                            { 
+                                left: `${b.x}%`, 
+                                top: `${b.y}%`, 
+                                width: `${b.w}%`, 
+                                height: `${b.h}%`, 
+                                backgroundColor: isActive ? Colors.primaryLight : '#FFFFFF',
+                                borderColor: isActive ? Colors.primary : Colors.border,
+                                borderWidth: isActive ? 2 : 1,
+                                zIndex: isActive ? 5 : 1,
+                            }
+                        ]}
+                    >
+                        <Text style={[mapStyles.buildingLabel, { color: isActive ? Colors.primary : Colors.textSecondary }]} numberOfLines={1}>
+                            {b.label}
+                        </Text>
+                    </View>
+                );
+            })}
+
+            {/* Path visualization */}
+            {showRoute && targetBuilding && (
+                <Svg style={StyleSheet.absoluteFill} pointerEvents="none">
+                    <Line 
+                        x1={`${userPos.x}%`} y1={`${userPos.y}%`} 
+                        x2={`${targetBuilding.x + targetBuilding.w/2}%`} 
+                        y2={`${targetBuilding.y + targetBuilding.h/2}%`}
+                        stroke={Colors.primary} strokeWidth="3" strokeDasharray="6,4"
+                    />
+                    <Circle
+                        cx={`${targetBuilding.x + targetBuilding.w/2}%`}
+                        cy={`${targetBuilding.y + targetBuilding.h/2}%`}
+                        r="5"
+                        fill={Colors.primary}
+                    />
+                </Svg>
+            )}
 
             {/* User dot */}
-            <View style={mapStyles.userDot}>
+            <View style={[mapStyles.userDot, { left: `${userPos.x}%`, top: `${userPos.y}%` }]}>
                 <View style={mapStyles.userDotInner} />
                 <View style={mapStyles.userDotRing} />
             </View>
@@ -116,101 +120,112 @@ function MockMapView({ activeLandmark }: { activeLandmark: string | null }) {
 }
 
 const mapStyles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: '#F7F8FA', position: 'relative' },
-    roadH: { position: 'absolute', left: 0, right: 0, height: 10, backgroundColor: '#E0E0E0' },
-    roadV: { position: 'absolute', top: 0, bottom: 0, width: 10, backgroundColor: '#E0E0E0' },
-    building: { position: 'absolute', borderRadius: 6, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(0,0,0,0.08)' },
-    buildingLabel: { fontSize: 8, color: Colors.textSecondary, fontWeight: '600', textAlign: 'center' },
-    userDot: { position: 'absolute', top: '50%', left: '45%', alignItems: 'center', justifyContent: 'center' },
+    container: { flex: 1, backgroundColor: '#F1F5F9', position: 'relative' },
+    roadH: { position: 'absolute', left: 0, right: 0 },
+    roadV: { position: 'absolute', top: 0, bottom: 0 },
+    building: { position: 'absolute', borderRadius: Radius.sm, alignItems: 'center', justifyContent: 'center' },
+    buildingLabel: { fontSize: 9, fontWeight: '700', textAlign: 'center' },
+    userDot: { position: 'absolute', alignItems: 'center', justifyContent: 'center', transform: [{ translateX: -6 }, { translateY: -6 }], zIndex: 10 },
     userDotInner: { width: 12, height: 12, borderRadius: 6, backgroundColor: Colors.primary, zIndex: 2 },
-    userDotRing: { position: 'absolute', width: 24, height: 24, borderRadius: 12, backgroundColor: 'rgba(252,128,25,0.25)' },
+    userDotRing: { position: 'absolute', width: 24, height: 24, borderRadius: 12, backgroundColor: Colors.primary + '30' },
     compass: { position: 'absolute', top: Spacing.md, left: Spacing.md, alignItems: 'center' },
     compassN: { ...Typography.label, color: Colors.error, fontWeight: '700', fontSize: 10 },
     zoomControls: {
         position: 'absolute',
-        top: Spacing.md,
+        bottom: Spacing.md,
         right: Spacing.md,
-        backgroundColor: Colors.cardBg,
-        borderRadius: Radius.sm,
-        ...Shadows.sm,
+        backgroundColor: '#FFFFFF',
+        borderRadius: Radius.md,
         overflow: 'hidden',
+        borderWidth: 0.5,
+        borderColor: Colors.border,
     },
-    zoomBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
-    zoomText: { ...Typography.h4, color: Colors.text },
-    zoomDivider: { height: 1, backgroundColor: Colors.divider },
+    zoomBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
+    zoomText: { fontSize: 20, color: Colors.text },
+    zoomDivider: { height: 0.5, backgroundColor: Colors.border },
 });
 
 export default function CampusMapScreen() {
+    const params = useLocalSearchParams<{ highlight?: string }>();
     const [activeLandmark, setActiveLandmark] = useState<string | null>(null);
+    const flatListRef = useRef<FlatList>(null);
+    
+    const { data: landmarks = [], isLoading } = useLandmarks();
 
-    const filtered = LANDMARKS;
+    useEffect(() => {
+        if (params.highlight && landmarks.length > 0) {
+            setActiveLandmark(params.highlight);
+            const index = landmarks.findIndex(l => l.id === params.highlight);
+            if (index !== -1) {
+                setTimeout(() => {
+                    flatListRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0.5 });
+                }, 500);
+            }
+        }
+    }, [params.highlight, landmarks]);
 
-    const currentLandmark = activeLandmark ? LANDMARKS.find((l) => l.id === activeLandmark) : null;
+    const currentLandmark = activeLandmark ? landmarks.find((l) => l.id === activeLandmark) : null;
+
+    const handleLandmarkPress = (id: string) => {
+        if (activeLandmark === id) {
+            setActiveLandmark(null);
+        } else {
+            setActiveLandmark(id);
+            const index = landmarks.findIndex(l => l.id === id);
+            if (index !== -1) {
+                flatListRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0.5 });
+            }
+        }
+    };
 
     return (
         <SafeAreaView style={styles.safe} edges={['top']}>
             <View style={styles.header}>
-                <TouchableOpacity onPress={() => router.back()}>
+                <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
                     <Ionicons name="arrow-back" size={22} color={Colors.text} />
                 </TouchableOpacity>
-                <Text style={styles.headerTitle}>Campus Map 🗺️</Text>
+                <Text style={styles.headerTitle}>Campus Map</Text>
                 <TouchableOpacity style={styles.layersBtn}>
                     <Ionicons name="layers-outline" size={20} color={Colors.text} />
                 </TouchableOpacity>
             </View>
 
-            {/* Map Takes Upper Half */}
             <View style={styles.mapContainer}>
-                <LinearGradient
-                    colors={['#1F1B3A', '#2B2D63', 'rgba(43,45,99,0.86)', 'rgba(43,45,99,0.2)']}
-                    style={styles.mapGradient}
-                />
-                <MockMapView activeLandmark={activeLandmark} />
-            </View>
-            <View style={styles.mapInfoWrapper}>
-                <View style={styles.mapInfoCard}>
-                    <View>
-                        <Text style={styles.mapInfoLabel}>You are here</Text>
-                        <Text style={styles.mapInfoTitle}>{currentLandmark ? currentLandmark.name : 'Campus Core'}</Text>
-                    </View>
-                    <View style={styles.mapInfoStats}>
-                        <Text style={styles.mapInfoStat}>{currentLandmark ? currentLandmark.distance : 'Approx 0m'} away</Text>
-                        <Text style={styles.mapInfoStat}>{currentLandmark ? currentLandmark.opens : 'All wings open'}</Text>
-                    </View>
-                </View>
+                <MockMapView activeLandmark={activeLandmark} showRoute={!!activeLandmark} landmarks={landmarks} />
             </View>
 
-            {/* Bottom Sheet */}
-            <View style={[styles.bottomSheet, Shadows.floating]}>
-                {/* Landmark List */}
+            <View style={styles.bottomSheet}>
+                <View style={styles.sheetHeader}>
+                    <View style={styles.sheetHandle} />
+                    <Text style={styles.sheetTitle}>Landmarks</Text>
+                </View>
+                
                 <FlatList
-                    data={filtered}
+                    ref={flatListRef}
+                    data={landmarks}
                     keyExtractor={(l) => l.id}
                     showsVerticalScrollIndicator={false}
                     contentContainerStyle={styles.landmarkList}
+                    onScrollToIndexFailed={() => {}}
                     renderItem={({ item }) => (
                         <TouchableOpacity
-                            style={[styles.landmarkCard, Shadows.sm]}
-                            onPress={() => setActiveLandmark(activeLandmark === item.id ? null : item.id)}
+                            style={[styles.landmarkCard, activeLandmark === item.id && styles.landmarkCardActive]}
+                            onPress={() => handleLandmarkPress(item.id)}
                             activeOpacity={0.9}
                         >
-                            {activeLandmark === item.id && <AnimatedGradientBorder />}
-
-                            {/* Inner content wrapper to sit above absolute border view */}
-                            <View style={{ flexDirection: 'row', alignItems: 'flex-start', flex: 1, zIndex: 1 }}>
-                                <View style={[styles.landmarkIcon, { backgroundColor: item.color }]}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                                <View style={[styles.landmarkIcon, { backgroundColor: item.color + '20' }]}>
                                     <Text style={{ fontSize: 20 }}>{item.icon}</Text>
                                 </View>
                                 <View style={styles.landmarkInfo}>
                                     <Text style={styles.landmarkName}>{item.name}</Text>
-                                    <Text style={styles.landmarkMeta}>{item.floor} · {item.distance}</Text>
-                                    <Text style={[styles.landmarkStatus, { color: item.available ? Colors.success : Colors.error }]}>
-                                        {item.opens}
-                                    </Text>
+                                    <Text style={styles.landmarkMeta}>{item.category} · {item.distance}</Text>
                                 </View>
                                 <View style={styles.landmarkRight}>
-                                    <TagPill label={item.category} variant="blue" size="sm" />
-                                    <Ionicons name="navigate-outline" size={18} color={Colors.primary} style={{ marginTop: 6 }} />
+                                    <View style={[styles.statusDot, { backgroundColor: item.available ? Colors.success : Colors.error }]} />
+                                    <Text style={[styles.statusText, { color: item.available ? Colors.success : Colors.error }]}>
+                                        {item.available ? "Open" : "Closed"}
+                                    </Text>
                                 </View>
                             </View>
                         </TouchableOpacity>
@@ -228,88 +243,55 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'space-between',
         paddingHorizontal: Spacing.lg,
-        paddingVertical: Spacing.sm,
+        paddingVertical: Spacing.md,
         backgroundColor: Colors.background,
-        zIndex: 10,
     },
-    headerTitle: { ...Typography.h3, color: Colors.text },
-    layersBtn: {
-        width: 36,
-        height: 36,
-        borderRadius: Radius.sm,
-        backgroundColor: Colors.sectionBg,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
+    backBtn: { width: 40, height: 40, borderRadius: 12, backgroundColor: Colors.surface, alignItems: 'center', justifyContent: 'center', borderWidth: 0.5, borderColor: Colors.divider },
+    headerTitle: { ...Typography.h3, color: Colors.text, flex: 1, textAlign: 'center' },
+    layersBtn: { width: 40, height: 40, borderRadius: 12, backgroundColor: Colors.surface, alignItems: 'center', justifyContent: 'center', borderWidth: 0.5, borderColor: Colors.divider },
     mapContainer: {
-        height: 280,
+        height: 320,
         marginHorizontal: Spacing.lg,
-        borderRadius: Radius.xl,
+        borderRadius: Radius.xxl,
         overflow: 'hidden',
-        marginTop: 4,
-        backgroundColor: '#0f0e25',
-    },
-    mapGradient: {
-        ...StyleSheet.absoluteFillObject,
+        borderWidth: 0.5,
+        borderColor: Colors.divider,
     },
     bottomSheet: {
         flex: 1,
-        backgroundColor: Colors.cardBg,
-        borderTopLeftRadius: Radius.xl,
-        borderTopRightRadius: Radius.xl,
-        paddingTop: Spacing.md,
-        marginTop: Spacing.sm,
+        backgroundColor: Colors.background,
+        borderTopLeftRadius: Radius.xxl,
+        borderTopRightRadius: Radius.xxl,
+        marginTop: Spacing.lg,
+        borderWidth: 0.5,
+        borderColor: Colors.divider,
     },
-    landmarkList: { paddingHorizontal: Spacing.lg, paddingBottom: Spacing.xxl, gap: Spacing.sm },
+    sheetHeader: { alignItems: 'center', paddingVertical: Spacing.md },
+    sheetHandle: { width: 40, height: 4, backgroundColor: Colors.divider, borderRadius: 2, marginBottom: 12 },
+    sheetTitle: { ...Typography.h4, color: Colors.text },
+    landmarkList: { paddingHorizontal: Spacing.lg, paddingBottom: 100, gap: Spacing.sm },
     landmarkCard: {
         flexDirection: 'row',
-        alignItems: 'flex-start',
-        backgroundColor: Colors.cardBg,
-        borderRadius: Radius.lg,
+        alignItems: 'center',
+        backgroundColor: Colors.surface,
+        borderRadius: Radius.xl,
         padding: Spacing.md,
-        borderColor: 'transparent',
+        borderWidth: 0.5,
+        borderColor: Colors.divider,
     },
+    landmarkCardActive: { borderColor: Colors.primary, backgroundColor: Colors.card, borderWidth: 1 },
     landmarkIcon: {
-        width: 48,
-        height: 48,
-        borderRadius: Radius.md,
+        width: 44,
+        height: 44,
+        borderRadius: 12,
         alignItems: 'center',
         justifyContent: 'center',
         marginRight: Spacing.md,
     },
-    landmarkInfo: { flex: 1, gap: 3 },
-    landmarkName: { ...Typography.h5, color: Colors.text },
-    landmarkMeta: { ...Typography.caption, color: Colors.textSecondary },
-    landmarkStatus: { ...Typography.caption, fontWeight: '600' },
-    landmarkRight: { alignItems: 'flex-end', marginLeft: Spacing.sm },
-    mapInfoWrapper: {
-        marginHorizontal: Spacing.lg,
-        marginTop: Spacing.md,
-    },
-    mapInfoCard: {
-        backgroundColor: 'rgba(255,255,255,0.95)',
-        borderRadius: Radius.xl,
-        padding: Spacing.md,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        ...Shadows.md,
-    },
-    mapInfoLabel: {
-        ...Typography.caption,
-        color: Colors.textSecondary,
-        textTransform: 'uppercase' as const,
-        letterSpacing: 0.5,
-    },
-    mapInfoTitle: {
-        ...Typography.h4,
-        fontWeight: '700',
-    },
-    mapInfoStats: {
-        alignItems: 'flex-end',
-    },
-    mapInfoStat: {
-        ...Typography.caption,
-        color: Colors.textSecondary,
-    },
+    landmarkInfo: { flex: 1 },
+    landmarkName: { ...Typography.h5, color: Colors.text, fontWeight: '600' },
+    landmarkMeta: { ...Typography.caption, color: Colors.textSecondary, marginTop: 2 },
+    landmarkRight: { alignItems: 'flex-end' },
+    statusDot: { width: 8, height: 8, borderRadius: 4, marginBottom: 4 },
+    statusText: { fontSize: 10, fontWeight: '700', textTransform: 'uppercase' },
 });

@@ -1,15 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
-import { useEffect } from 'react';
+import React from 'react';
 import { Platform, StyleSheet, View } from 'react-native';
-import Animated, {
-  useAnimatedStyle,
-  useSharedValue,
-  withSpring
-} from 'react-native-reanimated';
 import { useCartStore } from '../../src/store/cartStore';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Colors } from '../../src/theme';
+import { Colors, Radius } from '../../src/theme';
 
 interface TabIconProps {
   name: React.ComponentProps<typeof Ionicons>['name'];
@@ -19,13 +14,13 @@ interface TabIconProps {
 
 function TabIcon({ name, focused }: TabIconProps) {
   return (
-    <Animated.View style={[styles.navIconWrapper, focused && styles.navIconWrapperActive]}>
+    <View style={[styles.navIconWrapper, focused && styles.navIconWrapperActive]}>
       <Ionicons
         name={name}
         size={22}
-        color={focused ? '#0A0B10' : '#B7BDC6'}
+        color={focused ? Colors.text : Colors.textSecondary}
       />
-    </Animated.View>
+    </View>
   );
 }
 
@@ -38,13 +33,12 @@ export default function TabsLayout() {
       <Tabs
         screenOptions={{
           headerShown: false,
-          tabBarStyle: [styles.tabBar, { paddingBottom: insets.bottom || 8 }],
+          tabBarStyle: styles.tabBar,
           tabBarShowLabel: false,
           tabBarItemStyle: {
-            height: '100%',
+            height: 60,
             justifyContent: 'center',
             alignItems: 'center',
-            marginTop: 10,
           },
         }}
       >
@@ -94,31 +88,25 @@ export default function TabsLayout() {
 
 const styles = StyleSheet.create({
   tabBar: {
-    height: 90,
-    borderTopWidth: 0,
-    backgroundColor: '#111216',
-    borderTopLeftRadius: 0,
-    borderTopRightRadius: 0,
-    borderBottomLeftRadius: 0,
-    borderBottomRightRadius: 0,
-    paddingTop: 6,
+    height: 72,
+    borderTopWidth: 1,
+    borderTopColor: Colors.divider,
+    backgroundColor: Colors.background,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#020202',
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.35,
-    shadowRadius: 14,
-    elevation: 16,
+    paddingTop: 12,
   },
   navIconWrapper: {
-    width: 44,
-    height: 44,
-    borderRadius: 10,
+    width: 48,
+    height: 48,
+    borderRadius: Radius.lg,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'transparent',
   },
   navIconWrapperActive: {
-    backgroundColor: '#F7F7F7',
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.primary + '20',
   },
 });

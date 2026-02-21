@@ -9,6 +9,7 @@ import {
     View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import QRCode from 'react-native-qrcode-svg';
 import { Colors, Radius, Spacing, Typography } from '../../src/theme';
 
 const PRINT_PRICE = 45;
@@ -68,7 +69,12 @@ export default function PrintPaymentScreen() {
                     <View style={styles.qrCard}>
                         <Text style={styles.qrLabel}>Show QR at collection</Text>
                         <View style={styles.qrCode}>
-                            <Text style={styles.qrText}>{qrCode}</Text>
+                            <QRCode
+                                value={qrCode}
+                                size={180}
+                                color={Colors.text}
+                                backgroundColor="transparent"
+                            />
                         </View>
                         <Text style={styles.qrSlot}>Slot: {slotWindow}</Text>
                         <Text style={styles.statusMessage}>{status}</Text>

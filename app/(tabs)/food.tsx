@@ -1,55 +1,71 @@
 import { Ionicons } from '@expo/vector-icons';
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import {
+    Alert,
     Dimensions,
     Image,
     ScrollView,
     StatusBar,
     StyleSheet,
     Text,
-    TextInput,
     TouchableOpacity,
     View,
+    ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { menuCategories, menuItems, restaurants } from '../../src/data/food';
+import * as Haptics from 'expo-haptics';
+import { useRestaurants, useMenuItems, useMenuCategories } from '../../src/hooks/useFood';
 import { useCartStore } from '../../src/store/cartStore';
+import { useUserStore } from '../../src/store/userStore';
 import { router } from 'expo-router';
 import { Colors, Radius, Spacing, Typography } from '../../src/theme';
+import SearchBar from '../../src/components/ui/SearchBar';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const CHIP_SIZE = (SCREEN_WIDTH - Spacing.section * 2 - Spacing.md * 2) / 3;
-const categories = ['All', ...menuCategories.map((cat) => cat.name)];
 
 const canteenIcons: { [key: string]: React.ComponentProps<typeof Ionicons>['name'] } = {
-    'Canteen Central': 'cafe',
+    'Saffron Dhaba': 'cafe',
     'Burger Shed': 'fast-food',
     'Fresh Greens': 'leaf',
-    'Main Canteen': 'restaurant',
-    'South Court': 'restaurant',
-    'North Court': 'leaf',
-    'Express': 'rocket',
-    'Green Kitchen': 'water',
+    'Wok in Progress': 'restaurant',
 };
 
 export default function FoodScreen() {
-    const [activeRestaurantId, setActiveRestaurantId] = useState(restaurants[0].id);
+    const { profile } = useUserStore();
+    const { data: restaurants = [], isLoading: restaurantsLoading } = useRestaurants();
+    const [activeRestaurantId, setActiveRestaurantId] = useState<string | null>(null);
+    
+    useEffect(() => {
+        if (restaurants.length > 0 && !activeRestaurantId) {
+            setActiveRestaurantId(restaurants[0].id);
+        }
+    }, [restaurants, activeRestaurantId]);
+
+    const { data: menuItems = [], isLoading: menuLoading } = useMenuItems(activeRestaurantId ?? '');
+    const { data: dbCategories = [] } = useMenuCategories(activeRestaurantId ?? '');
+
     const [search, setSearch] = useState('');
     const [activeCategory, setActiveCategory] = useState('All');
     const [vegOnly, setVegOnly] = useState(false);
     const [nonVegOnly, setNonVegOnly] = useState(false);
+    
     const cart = useCartStore();
 
-    const restaurant =
-        restaurants.find((r) => r.id === activeRestaurantId) ?? restaurants[0];
+    const restaurant = useMemo(() => 
+        restaurants.find((r) => r.id === activeRestaurantId) ?? restaurants[0]
+    , [restaurants, activeRestaurantId]);
+
+    const categories = useMemo(() => {
+        const unique = new Set(['All', ...dbCategories]);
+        return Array.from(unique);
+    }, [dbCategories]);
 
     const filteredItems = useMemo(() => {
         return menuItems
             .filter((item) => {
-                if (item.restaurantId !== activeRestaurantId) return false;
                 if (activeCategory !== 'All' && item.category !== activeCategory) return false;
-                if (vegOnly && !item.isVeg) return false;
-                if (nonVegOnly && item.isVeg) return false;
+                if (vegOnly && !item.is_veg) return false;
+                if (nonVegOnly && item.is_veg) return false;
                 if (
                     search &&
                     !item.name.toLowerCase().includes(search.toLowerCase()) &&
@@ -59,250 +75,291 @@ export default function FoodScreen() {
                 }
                 return true;
             })
-            .sort((a, b) => Number(b.isPopular) - Number(a.isPopular));
-    }, [activeRestaurantId, activeCategory, vegOnly, nonVegOnly, search]);
+            .sort((a, b) => Number(b.is_popular) - Number(a.is_popular));
+    }, [menuItems, activeCategory, vegOnly, nonVegOnly, search]);
 
-    const trendingRecipe = useMemo(
-        () =>
-            menuItems.find(
-                (item) => item.isPopular && item.restaurantId === activeRestaurantId
-            ) ??
-            menuItems.find((item) => item.isPopular) ??
-            menuItems[0],
-        [activeRestaurantId]
-    );
+    const trendingRecipe = useMemo(() => 
+        filteredItems.find((item) => item.is_popular) ?? filteredItems[0]
+    , [filteredItems]);
 
     const cartCount = cart.totalItems();
     const cartTotal = cart.totalPrice();
 
-    const trendingImageUri =
-        trendingRecipe?.image ?? 'https://images.unsplash.com/photo-1504754524776-8f4f37790ca0?w=800&q=80';
+    const handleAddItem = (item: any) => {
+        const currentRestId = cart.restaurantId;
+        const currentRestName = cart.restaurantName || 'another restaurant';
+        
+        if (currentRestId && currentRestId !== item.restaurant_id) {
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+            Alert.alert(
+                'Replace cart items?',
+                `Your cart contains items from ${currentRestName}. Do you want to discard them and add this item from ${restaurant?.name || 'this restaurant'}?`,
+                [
+                    { text: 'Cancel', style: 'cancel' },
+                    { 
+                        text: 'Discard & Add', 
+                        style: 'destructive',
+                        onPress: () => {
+                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                            cart.addItem(item, item.restaurant_id, restaurant?.name);
+                        }
+                    },
+                ]
+            );
+        } else {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            cart.addItem(item, item.restaurant_id, restaurant?.name);
+        }
+    };
+
+    const handleDecrement = (itemId: string) => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        cart.decrementItem(itemId);
+    };
+
+    if (restaurantsLoading) {
+        return (
+            <SafeAreaView style={styles.safe} edges={['top']}>
+                <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                    <ActivityIndicator color={Colors.primary} size="large" />
+                </View>
+            </SafeAreaView>
+        );
+    }
 
     return (
         <SafeAreaView style={styles.safe} edges={['top']}>
-            <StatusBar barStyle="dark-content" />
+            <StatusBar barStyle="light-content" />
+            
+            <View style={styles.header}>
+                <View>
+                    <Text style={styles.welcomeText}>Craving something?</Text>
+                    <Text style={styles.nameText}>{profile?.name?.split(' ')[0] ?? 'Yugank'}'s Kitchen</Text>
+                </View>
+                <TouchableOpacity
+                    style={styles.cartIconWrap}
+                    onPress={() => router.push('/cart')}
+                    activeOpacity={0.85}
+                >
+                    <Ionicons name="cart-outline" size={22} color={Colors.text} />
+                    {cartCount > 0 && (
+                        <View style={styles.badgeCircle}>
+                            <Text style={styles.badgeText}>{cartCount}</Text>
+                        </View>
+                    )}
+                </TouchableOpacity>
+            </View>
+
             <ScrollView
                 showsVerticalScrollIndicator={false}
                 contentContainerStyle={styles.scrollContent}
+                keyboardShouldPersistTaps="always"
+                stickyHeaderIndices={[1]}
             >
-                <View style={styles.headerRow}>
-                    <View>
-                        <Text style={styles.pretitle}>Good afternoon</Text>
-                        <Text style={styles.title}>What’s cooking today?</Text>
+                <View style={styles.summaryWrap}>
+                    <View style={styles.summaryIconWrap}>
+                        <Ionicons name="sparkles" size={14} color={Colors.accent} />
                     </View>
-                    <TouchableOpacity
-                        style={styles.cartIconWrap}
-                        onPress={() => router.push('/cart')}
-                        activeOpacity={0.85}
-                    >
-                        <Ionicons name="cart-outline" size={22} color={Colors.text} />
-                        {cartCount > 0 && (
-                            <View style={styles.badgeCircle}>
-                                <Text style={styles.badgeText}>{cartCount}</Text>
-                            </View>
-                        )}
-                    </TouchableOpacity>
+                    <Text style={styles.summaryText}>
+                        Current selection: <Text style={styles.summaryHighlight}>{restaurant?.name || 'Loading...'}</Text> is ready for orders.
+                    </Text>
                 </View>
-                <View style={styles.searchRow}>
-                    <Ionicons name="search" size={18} color={Colors.textSecondary} />
-                    <TextInput
-                        style={styles.searchInput}
-                        placeholder="Search here"
-                        placeholderTextColor={Colors.textSecondary}
+
+                <View style={styles.searchContainerSticky}>
+                    <SearchBar
+                        placeholder="Search menu items..."
                         value={search}
                         onChangeText={setSearch}
+                        onClear={() => setSearch('')}
                     />
-                    <Ionicons name="mic" size={18} color={Colors.textSecondary} />
                 </View>
 
-                <Text style={styles.sectionLabel}>Choose a canteen</Text>
-                <View style={styles.canteenGrid}>
-                    {restaurants.map((canteen) => {
-                        const iconName = canteenIcons[canteen.name] ?? 'restaurant';
-                        const isActive = canteen.id === activeRestaurantId;
-                        return (
-                            <TouchableOpacity
-                                key={canteen.id}
-                                style={[
-                                    styles.canteenChip,
-                                    isActive && styles.canteenChipActive,
-                                ]}
-                                activeOpacity={0.85}
-                                onPress={() => {
-                                    setActiveRestaurantId(canteen.id);
-                                    setSearch('');
-                                    setNonVegOnly(false);
-                                    setVegOnly(false);
-                                }}
-                            >
-                                <View style={styles.canteenIconWrap}>
-                                    <Ionicons name={iconName} size={22} color={Colors.success} />
-                                </View>
-                                <Text style={styles.canteenLabel} numberOfLines={2}>
-                                    {canteen.name}
-                                </Text>
-                            </TouchableOpacity>
-                        );
-                    })}
+                <View style={styles.sectionHeaderWrap}>
+                    <Text style={styles.sectionLabel}>Quick Canteens</Text>
                 </View>
 
-                <Text style={styles.sectionLabel}>Trending Recipe</Text>
-                <View style={styles.trendingCard}>
-                    <Image source={{ uri: trendingImageUri }} style={styles.trendingImage} />
-                    <View style={styles.trendingInfo}>
-                        <Text style={styles.trendingTag}>Chef’s pick</Text>
-                        <Text style={styles.trendingTitle} numberOfLines={2}>
-                            {trendingRecipe?.name}
-                        </Text>
-                        <Text style={styles.trendingMeta}>
-                            {trendingRecipe?.description}
-                        </Text>
-                        <View style={styles.trendingActions}>
-                            <TouchableOpacity
-                                style={styles.bookBtn}
-                                onPress={() => {
-                                    if (trendingRecipe) {
-                                        cart.addItem(
-                                            trendingRecipe,
-                                            trendingRecipe.restaurantId,
-                                            restaurant.name
-                                        );
-                                    }
-                                }}
-                                activeOpacity={0.85}
-                            >
-                                <Text style={styles.bookBtnText}>Book it</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity>
-                                <Ionicons
-                                    name="heart-outline"
-                                    size={22}
-                                    color={Colors.success}
-                                />
-                            </TouchableOpacity>
-                        </View>
-                    </View>
-                </View>
-
-                <View style={styles.filterRow}>
-                    <TouchableOpacity
-                        style={[styles.filterToggle, vegOnly && styles.filterToggleActive]}
-                        onPress={() => {
-                            setVegOnly(!vegOnly);
-                            if (!vegOnly) setNonVegOnly(false);
-                        }}
-                        activeOpacity={0.85}
-                    >
-                        <Text style={[styles.toggleText, vegOnly && styles.toggleTextActive]}>Veg only</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                        style={[styles.filterToggle, nonVegOnly && styles.filterToggleActive]}
-                        onPress={() => {
-                            setNonVegOnly(!nonVegOnly);
-                            if (!nonVegOnly) setVegOnly(false);
-                        }}
-                        activeOpacity={0.85}
-                    >
-                        <Text style={[styles.toggleText, nonVegOnly && styles.toggleTextActive]}>
-                            Non-veg
-                        </Text>
-                    </TouchableOpacity>
-                </View>
-
-                <ScrollView
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={styles.categoryRow}
-                >
-                    {categories.map((category) => {
-                        const isActive = activeCategory === category;
-                        return (
-                            <TouchableOpacity
-                                key={category}
-                                style={[styles.categoryChip, isActive && styles.categoryChipActive]}
-                                onPress={() => setActiveCategory(category)}
-                                activeOpacity={0.85}
-                            >
-                                <Text
-                                    style={[
-                                        styles.categoryText,
-                                        isActive && styles.categoryTextActive,
-                                    ]}
+                <View style={styles.shortcutsSection}>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.shortcutsGrid}>
+                        {restaurants.map((canteen) => {
+                            const iconName = canteenIcons[canteen.name] ?? 'restaurant';
+                            const isActive = canteen.id === activeRestaurantId;
+                            
+                            return (
+                                <TouchableOpacity
+                                    key={canteen.id}
+                                    style={styles.shortcutItem}
+                                    activeOpacity={0.85}
+                                    onPress={() => {
+                                        setActiveRestaurantId(canteen.id);
+                                        setActiveCategory('All');
+                                        setSearch('');
+                                    }}
                                 >
-                                    {category}
-                                </Text>
-                            </TouchableOpacity>
-                        );
-                    })}
-                </ScrollView>
-
-                <View style={styles.menuSection}>
-                    {filteredItems.length === 0 && (
-                        <Text style={styles.emptyText}>No dishes match your filters.</Text>
-                    )}
-                    {filteredItems.map((item) => {
-                        const qty = cart.getQuantity(item.id);
-                        return (
-                            <View key={item.id} style={styles.menuCard}>
-                                <Image source={{ uri: item.image }} style={styles.menuImage} />
-                                <View style={styles.menuContent}>
-                                    <Text style={styles.menuTitle}>{item.name}</Text>
-                                    <Text style={styles.menuDesc} numberOfLines={2}>
-                                        {item.description}
+                                    <View style={[
+                                        styles.shortcutIconWrap, 
+                                        { backgroundColor: isActive ? Colors.primary : Colors.secondary },
+                                    ]}>
+                                        <Ionicons name={iconName} size={22} color={isActive ? Colors.primaryForeground : Colors.primary} />
+                                    </View>
+                                    <Text style={[styles.shortcutText, isActive && { color: Colors.primary, fontFamily: 'Sora_700Bold' }]} numberOfLines={1}>
+                                        {canteen.name}
                                     </Text>
-                                    <View style={styles.menuMetaRow}>
-                                        <Text style={styles.menuPrice}>₹{item.price}</Text>
-                                        <View style={styles.menuRating}>
-                                            <Ionicons name="star" size={14} color="#FFD60A" />
-                                            <Text style={styles.menuRatingText}>{item.rating}</Text>
+                                </TouchableOpacity>
+                            );
+                        })}
+                    </ScrollView>
+                </View>
+
+                {menuLoading ? (
+                    <ActivityIndicator color={Colors.primary} style={{ marginVertical: 40 }} />
+                ) : (
+                    <>
+                        <View style={styles.sectionHeaderWrap}>
+                            <Text style={styles.sectionLabel}>Student’s Top Pick</Text>
+                        </View>
+                        
+                        {trendingRecipe && (
+                            <TouchableOpacity style={styles.spotlightWrap} onPress={() => handleAddItem(trendingRecipe)}>
+                                <View style={styles.trendingCard}>
+                                    <Image source={{ uri: trendingRecipe.image || '' }} style={styles.trendingImage} />
+                                    <View style={styles.trendingInfo}>
+                                        <View style={styles.trendingHeader}>
+                                            <Text style={styles.trendingTag}>RECOMMENDED</Text>
+                                            <TouchableOpacity>
+                                                <Ionicons name="heart-outline" size={20} color={Colors.textLight} />
+                                            </TouchableOpacity>
+                                        </View>
+                                        <Text style={styles.trendingTitle} numberOfLines={1}>
+                                            {trendingRecipe.name}
+                                        </Text>
+                                        <Text style={styles.trendingMeta} numberOfLines={2}>
+                                            {trendingRecipe.description}
+                                        </Text>
+                                        <View style={styles.trendingFooter}>
+                                            <Text style={styles.trendingPrice}>₹{trendingRecipe.price}</Text>
+                                            <View style={styles.bookBtn}>
+                                                <Text style={styles.bookBtnText}>ADD</Text>
+                                            </View>
                                         </View>
                                     </View>
-                                    <View style={styles.menuActions}>
-                                        {qty === 0 ? (
-                                            <TouchableOpacity
-                                                style={styles.menuAddBtn}
-                                                onPress={() =>
-                                                    cart.addItem(item, item.restaurantId, restaurant.name)
-                                                }
-                                                activeOpacity={0.85}
-                                            >
-                                                <Text style={styles.menuAddText}>Add</Text>
-                                            </TouchableOpacity>
-                                        ) : (
-                                            <View style={styles.qtyRow}>
-                                                <TouchableOpacity
-                                                    onPress={() => cart.decrementItem(item.id)}
-                                                    style={styles.qtyBtn}
-                                                    activeOpacity={0.85}
-                                                >
-                                                    <Ionicons
-                                                        name="remove-circle-outline"
-                                                        size={24}
-                                                        color={Colors.textSecondary}
-                                                    />
-                                                </TouchableOpacity>
-                                                <Text style={styles.qtyValue}>{qty}</Text>
-                                                <TouchableOpacity
-                                                    onPress={() =>
-                                                        cart.addItem(item, item.restaurantId, restaurant.name)
-                                                    }
-                                                    style={styles.qtyBtn}
-                                                    activeOpacity={0.85}
-                                                >
-                                                    <Ionicons
-                                                        name="add-circle"
-                                                        size={24}
-                                                        color={Colors.success}
-                                                    />
-                                                </TouchableOpacity>
-                                            </View>
-                                        )}
-                                    </View>
                                 </View>
-                            </View>
-                        );
-                    })}
-                </View>
+                            </TouchableOpacity>
+                        )}
+
+                        <View style={styles.filterRow}>
+                            <TouchableOpacity
+                                style={[styles.filterToggle, vegOnly && styles.filterToggleActive]}
+                                onPress={() => {
+                                    setVegOnly(!vegOnly);
+                                    if (!vegOnly) setNonVegOnly(false);
+                                }}
+                                activeOpacity={0.85}
+                            >
+                                <Text style={[styles.toggleText, vegOnly && styles.toggleTextActive]}>Veg only</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[styles.filterToggle, nonVegOnly && styles.filterToggleActive]}
+                                onPress={() => {
+                                    setNonVegOnly(!nonVegOnly);
+                                    if (!nonVegOnly) setVegOnly(false);
+                                }}
+                                activeOpacity={0.85}
+                            >
+                                <Text style={[styles.toggleText, nonVegOnly && styles.toggleTextActive]}>
+                                    Non-veg
+                                </Text>
+                            </TouchableOpacity>
+                        </View>
+
+                        <ScrollView
+                            horizontal
+                            showsHorizontalScrollIndicator={false}
+                            contentContainerStyle={styles.categoryRow}
+                        >
+                            {categories.map((category) => {
+                                const isActive = activeCategory === category;
+                                return (
+                                    <TouchableOpacity
+                                        key={category}
+                                        style={[styles.categoryChip, isActive && styles.categoryChipActive]}
+                                        onPress={() => setActiveCategory(category)}
+                                        activeOpacity={0.85}
+                                    >
+                                        <Text
+                                            style={[
+                                                styles.categoryText,
+                                                isActive && styles.categoryTextActive,
+                                            ]}
+                                        >
+                                            {category}
+                                        </Text>
+                                    </TouchableOpacity>
+                                );
+                            })}
+                        </ScrollView>
+
+                        <View style={styles.menuSection}>
+                            {filteredItems.length === 0 && (
+                                <Text style={styles.emptyText}>No dishes match your filters.</Text>
+                            )}
+                            {filteredItems.map((item) => {
+                                const qty = cart.getQuantity(item.id);
+                                
+                                return (
+                                    <View key={item.id} style={styles.menuCard}>
+                                        <View style={[styles.menuImageWrap, { backgroundColor: Colors.secondary }]}>
+                                            <Image source={{ uri: item.image || '' }} style={styles.menuImage} />
+                                        </View>
+                                        <View style={styles.menuContent}>
+                                            <View style={styles.menuTopRow}>
+                                                <Text style={styles.menuTitle}>{item.name}</Text>
+                                                <View style={styles.menuRating}>
+                                                    <Ionicons name="star" size={12} color={Colors.warning} />
+                                                    <Text style={styles.menuRatingText}>{item.rating}</Text>
+                                                </View>
+                                            </View>
+                                            <Text style={styles.menuDesc} numberOfLines={1}>
+                                                {item.description}
+                                            </Text>
+                                            <View style={styles.menuMetaRow}>
+                                                <Text style={styles.menuPrice}>₹{item.price}</Text>
+                                                <View style={styles.menuActions}>
+                                                    {qty === 0 ? (
+                                                        <TouchableOpacity
+                                                            style={[styles.menuAddBtn, { backgroundColor: Colors.primary }]}
+                                                            onPress={() => handleAddItem(item)}
+                                                            activeOpacity={0.85}
+                                                        >
+                                                            <Text style={styles.menuAddText}>+ ADD</Text>
+                                                        </TouchableOpacity>
+                                                    ) : (
+                                                        <View style={styles.qtyRow}>
+                                                            <TouchableOpacity
+                                                                onPress={() => handleDecrement(item.id)}
+                                                                style={styles.qtyBtn}
+                                                                activeOpacity={0.85}
+                                                            >
+                                                                <Ionicons name="remove-circle-outline" size={22} color={Colors.mutedForeground} />
+                                                            </TouchableOpacity>
+                                                            <Text style={styles.qtyValue}>{qty}</Text>
+                                                            <TouchableOpacity
+                                                                onPress={() => handleAddItem(item)}
+                                                                style={styles.qtyBtn}
+                                                                activeOpacity={0.85}
+                                                            >
+                                                                <Ionicons name="add-circle" size={22} color={Colors.primary} />
+                                                            </TouchableOpacity>
+                                                        </View>
+                                                    )}
+                                                </View>
+                                            </View>
+                                        </View>
+                                    </View>
+                                );
+                            })}
+                        </View>
+                    </>
+                )}
 
                 {cartCount > 0 && (
                     <TouchableOpacity
@@ -311,14 +368,17 @@ export default function FoodScreen() {
                         onPress={() => router.push('/cart')}
                     >
                         <View>
-                            <Text style={styles.cartSummaryLabel}>View cart</Text>
+                            <Text style={styles.cartSummaryLabel}>Review your selection</Text>
                             <Text style={styles.cartSummaryPrice}>
                                 {cartCount} items · ₹{cartTotal}
                             </Text>
                         </View>
-                        <Ionicons name="chevron-forward" size={20} color={Colors.text} />
+                        <View style={styles.cartSummaryArrow}>
+                            <Ionicons name="chevron-forward" size={20} color={Colors.textLight} />
+                        </View>
                     </TouchableOpacity>
                 )}
+                <View style={{ height: 120 }} />
             </ScrollView>
         </SafeAreaView>
     );
@@ -327,131 +387,102 @@ export default function FoodScreen() {
 const styles = StyleSheet.create({
     safe: { flex: 1, backgroundColor: Colors.background },
     scrollContent: {
-        padding: Spacing.section,
-        paddingBottom: Spacing.xxxl,
+        paddingBottom: 110,
     },
-    headerRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        marginBottom: Spacing.lg,
+    header: { 
+        flexDirection: 'row', 
+        alignItems: 'center', 
+        justifyContent: 'space-between', 
+        paddingHorizontal: Spacing.section, 
+        paddingTop: Spacing.md, 
+        paddingBottom: Spacing.md, 
+        backgroundColor: Colors.background 
     },
-    pretitle: {
-        ...Typography.body2,
-        color: Colors.textSecondary,
-    },
-    title: {
-        ...Typography.h2,
-        color: Colors.text,
-        marginTop: Spacing.xs,
-    },
+    welcomeText: { ...Typography.caption, color: Colors.textSecondary },
+    nameText: { ...Typography.h2, color: Colors.text },
     cartIconWrap: {
-        width: 52,
-        height: 52,
-        borderRadius: 16,
+        width: 40,
+        height: 40,
+        borderRadius: Radius.md,
         backgroundColor: Colors.surface,
-        borderWidth: 1,
+        borderWidth: 0.5,
         borderColor: Colors.divider,
         alignItems: 'center',
         justifyContent: 'center',
         position: 'relative',
     },
     badgeCircle: {
-        width: 28,
-        height: 28,
-        borderRadius: 16,
-        backgroundColor: Colors.success,
+        width: 20,
+        height: 20,
+        borderRadius: Radius.pill,
+        backgroundColor: Colors.primary,
         alignItems: 'center',
         justifyContent: 'center',
         position: 'absolute',
-        top: -4,
-        right: -4,
+        top: -6,
+        right: -6,
     },
     badgeText: {
-        ...Typography.caption,
+        ...Typography.micro,
         color: '#fff',
-        fontWeight: '700' as const,
+        fontFamily: 'Sora_700Bold',
     },
-    searchRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: Colors.surface,
-        borderRadius: Radius.xl,
-        paddingHorizontal: Spacing.md,
-        paddingVertical: Spacing.sm,
-        borderWidth: 1,
-        borderColor: Colors.divider,
-        marginBottom: Spacing.lg,
+    summaryWrap: { 
+        paddingHorizontal: Spacing.section, 
+        marginBottom: Spacing.sm, 
+        flexDirection: 'row', 
+        alignItems: 'center', 
+        gap: 10 
     },
-    searchInput: {
-        flex: 1,
-        ...Typography.body2,
-        marginHorizontal: Spacing.sm,
-        color: Colors.text,
+    summaryIconWrap: { 
+        width: 24, 
+        height: 24, 
+        borderRadius: Radius.pill, 
+        backgroundColor: Colors.accentLight, 
+        alignItems: 'center', 
+        justifyContent: 'center' 
     },
+    summaryText: { flex: 1, ...Typography.caption, color: Colors.textSecondary },
+    summaryHighlight: { color: Colors.text, fontFamily: 'Sora_700Bold' },
+    searchContainerSticky: { 
+        paddingHorizontal: Spacing.section, 
+        paddingVertical: Spacing.sm, 
+        backgroundColor: Colors.background, 
+        zIndex: 10 
+    },
+    sectionHeaderWrap: { paddingHorizontal: Spacing.section, marginTop: Spacing.md, marginBottom: Spacing.md },
     sectionLabel: {
         ...Typography.h4,
         color: Colors.text,
-        marginBottom: Spacing.sm,
     },
-    canteenGrid: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        justifyContent: 'space-between',
-        marginBottom: Spacing.lg,
+    shortcutsSection: { marginBottom: Spacing.lg },
+    shortcutsGrid: { paddingHorizontal: Spacing.section, gap: Spacing.md },
+    shortcutItem: { alignItems: 'center', width: 100 },
+    shortcutIconWrap: { 
+        width: 50, 
+        height: 50, 
+        borderRadius: Radius.lg, 
+        alignItems: 'center', 
+        justifyContent: 'center', 
+        marginBottom: 8, 
+        borderWidth: 0.5, 
+        borderColor: Colors.divider 
     },
-    canteenChip: {
-        width: CHIP_SIZE,
-        height: CHIP_SIZE,
-        backgroundColor: Colors.surface,
-        borderRadius: Radius.xl,
-        alignItems: 'center',
-        justifyContent: 'center',
-        borderWidth: 1,
-        borderColor: Colors.divider,
-        padding: Spacing.sm,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 8 },
-        shadowRadius: 12,
-        shadowOpacity: 0.05,
-        elevation: 2,
-        marginBottom: Spacing.md,
-    },
-    canteenChipActive: {
-        borderColor: Colors.success,
-        backgroundColor: '#EAFFF4',
-    },
-    canteenIconWrap: {
-        width: 42,
-        height: 42,
-        borderRadius: Radius.md,
-        backgroundColor: 'rgba(76,206,143,0.15)',
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginBottom: Spacing.xs,
-    },
-    canteenLabel: {
-        ...Typography.caption,
-        color: Colors.text,
-        textAlign: 'center',
+    shortcutText: { ...Typography.micro, color: Colors.textSecondary },
+    spotlightWrap: { 
+        marginHorizontal: Spacing.section, 
+        marginVertical: Spacing.md, 
+        borderRadius: Radius.xxl, 
+        overflow: 'hidden', 
     },
     trendingCard: {
-        borderRadius: Radius.xxl,
-        backgroundColor: Colors.surface,
-        overflow: 'hidden',
-        borderWidth: 1,
-        borderColor: Colors.divider,
+        backgroundColor: Colors.primary,
         flexDirection: 'row',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 12 },
-        shadowOpacity: 0.08,
-        shadowRadius: 20,
-        elevation: 6,
-        marginBottom: Spacing.lg,
+        height: 160,
     },
     trendingImage: {
-        width: 130,
-        height: 150,
+        width: 140,
+        height: '100%',
         resizeMode: 'cover',
     },
     trendingInfo: {
@@ -459,89 +490,92 @@ const styles = StyleSheet.create({
         padding: Spacing.md,
         justifyContent: 'space-between',
     },
+    trendingHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
     trendingTag: {
-        ...Typography.label,
+        ...Typography.micro,
         color: Colors.success,
+        fontFamily: 'Sora_700Bold',
+        letterSpacing: 1,
     },
     trendingTitle: {
         ...Typography.h3,
-        color: Colors.text,
-        marginBottom: Spacing.xs,
+        color: '#FFFFFF',
     },
     trendingMeta: {
-        ...Typography.body2,
-        color: Colors.textSecondary,
+        ...Typography.caption,
+        color: 'rgba(255,255,255,0.7)',
+        lineHeight: 16,
     },
-    trendingActions: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        marginTop: Spacing.sm,
-    },
+    trendingFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+    trendingPrice: { ...Typography.h4, color: '#FFFFFF' },
     bookBtn: {
-        backgroundColor: Colors.success,
-        borderRadius: Radius.md,
-        paddingHorizontal: Spacing.lg,
-        paddingVertical: Spacing.sm,
+        backgroundColor: '#FFFFFF',
+        borderRadius: Radius.pill,
+        paddingHorizontal: 16,
+        paddingVertical: 6,
     },
     bookBtnText: {
-        ...Typography.body1,
-        color: '#fff',
-        fontWeight: '600' as const,
+        ...Typography.micro,
+        color: Colors.primary,
+        fontFamily: 'Sora_700Bold',
     },
     filterRow: {
         flexDirection: 'row',
+        paddingHorizontal: Spacing.section,
         gap: Spacing.sm,
+        marginTop: Spacing.sm,
         marginBottom: Spacing.md,
     },
     filterToggle: {
         flex: 1,
-        borderRadius: Radius.xl,
-        borderWidth: 1,
+        borderRadius: Radius.lg,
+        borderWidth: 0.5,
         borderColor: Colors.divider,
-        paddingVertical: Spacing.sm,
+        paddingVertical: 10,
         alignItems: 'center',
+        backgroundColor: Colors.surface,
     },
     filterToggleActive: {
-        borderColor: Colors.success,
-        backgroundColor: '#EAFFF4',
+        borderColor: Colors.primary + '40',
+        backgroundColor: Colors.primaryLight,
     },
     toggleText: {
         ...Typography.caption,
         color: Colors.textSecondary,
+        fontFamily: 'Sora_600SemiBold',
     },
     toggleTextActive: {
-        color: Colors.success,
-        fontWeight: '600' as const,
+        color: Colors.primary,
+        fontFamily: 'Sora_700Bold',
     },
     categoryRow: {
-        paddingVertical: Spacing.sm,
-        paddingRight: Spacing.section,
+        paddingHorizontal: Spacing.section,
+        paddingBottom: Spacing.md,
+        gap: Spacing.md,
     },
     categoryChip: {
-        borderRadius: Radius.xl,
-        borderWidth: 1,
+        borderRadius: Radius.pill,
+        borderWidth: 0.5,
         borderColor: Colors.divider,
-        paddingHorizontal: Spacing.md,
-        paddingVertical: Spacing.xs,
-        marginRight: Spacing.md,
+        paddingHorizontal: 16,
+        paddingVertical: 8,
         backgroundColor: Colors.surface,
     },
     categoryChipActive: {
-        borderColor: Colors.success,
-        backgroundColor: '#F0FFF9',
+        borderColor: Colors.primary,
+        backgroundColor: Colors.primary,
     },
     categoryText: {
         ...Typography.caption,
         color: Colors.textSecondary,
     },
     categoryTextActive: {
-        color: Colors.success,
-        fontWeight: '600' as const,
+        color: Colors.textLight,
+        fontFamily: 'Sora_700Bold',
     },
     menuSection: {
-        marginTop: Spacing.md,
-        marginBottom: Spacing.lg,
+        paddingHorizontal: Spacing.section,
+        gap: Spacing.md,
     },
     emptyText: {
         ...Typography.body2,
@@ -550,109 +584,109 @@ const styles = StyleSheet.create({
         marginVertical: Spacing.lg,
     },
     menuCard: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        padding: Spacing.md,
-        borderRadius: Radius.xl,
-        backgroundColor: Colors.surface,
-        borderWidth: 1,
-        borderColor: Colors.divider,
-        marginBottom: Spacing.md,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 6 },
-        shadowOpacity: 0.04,
-        shadowRadius: 12,
-        elevation: 3,
+        flexDirection: 'row', 
+        alignItems: 'center', 
+        gap: 12, 
+        padding: 12, 
+        borderRadius: Radius.lg, 
+        backgroundColor: Colors.surface, 
+        borderWidth: 0.5, 
+        borderColor: Colors.divider 
+    },
+    menuImageWrap: { 
+        width: 70, 
+        height: 70, 
+        borderRadius: Radius.md, 
+        overflow: 'hidden',
+        alignItems: 'center', 
+        justifyContent: 'center', 
     },
     menuImage: {
-        width: 90,
-        height: 90,
+        width: '100%',
+        height: '100%',
         borderRadius: Radius.md,
-        marginRight: Spacing.md,
     },
     menuContent: {
         flex: 1,
     },
-    menuTitle: {
-        ...Typography.h4,
-        color: Colors.text,
-    },
+    menuTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+    menuTitle: { ...Typography.h5, color: Colors.text },
+    menuRating: { flexDirection: 'row', alignItems: 'center', gap: 2 },
+    menuRatingText: { ...Typography.micro, color: Colors.textSecondary },
     menuDesc: {
-        ...Typography.body2,
+        ...Typography.caption,
         color: Colors.textSecondary,
-        marginVertical: Spacing.xs,
+        marginTop: 2,
     },
     menuMetaRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
+        marginTop: 8,
     },
     menuPrice: {
-        ...Typography.h4,
+        ...Typography.h5,
+        fontFamily: 'Sora_700Bold',
         color: Colors.text,
-    },
-    menuRating: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: Spacing.xs / 2,
-    },
-    menuRatingText: {
-        ...Typography.caption,
-        color: Colors.textSecondary,
     },
     menuActions: {
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'flex-end',
-        marginTop: Spacing.sm,
     },
     menuAddBtn: {
-        backgroundColor: Colors.success,
-        borderRadius: Radius.xl,
-        paddingVertical: Spacing.xs,
-        paddingHorizontal: Spacing.lg,
+        borderRadius: Radius.pill,
+        paddingVertical: 6,
+        paddingHorizontal: 16,
     },
     menuAddText: {
-        ...Typography.body2,
+        ...Typography.micro,
         color: '#fff',
-        fontWeight: '600' as const,
+        fontFamily: 'Sora_700Bold',
     },
     qtyRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: Spacing.sm,
+        gap: 8,
     },
     qtyBtn: {
-        padding: Spacing.xs,
+        padding: 2,
     },
     qtyValue: {
         ...Typography.body2,
         color: Colors.text,
-        fontWeight: '700' as const,
+        fontFamily: 'Sora_700Bold',
+        minWidth: 20,
+        textAlign: 'center',
     },
     cartSummary: {
+        position: 'absolute',
+        bottom: 100,
+        left: Spacing.section,
+        right: Spacing.section,
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        padding: Spacing.md,
+        padding: 16,
         borderRadius: Radius.xl,
-        backgroundColor: Colors.surface,
-        borderWidth: 1,
-        borderColor: Colors.divider,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 10 },
-        shadowOpacity: 0.08,
-        shadowRadius: 20,
-        elevation: 6,
-        marginBottom: Spacing.md,
+        backgroundColor: Colors.primary,
     },
     cartSummaryLabel: {
-        ...Typography.caption,
-        color: Colors.textSecondary,
+        ...Typography.micro,
+        color: 'rgba(255,255,255,0.8)',
+        fontFamily: 'Sora_600SemiBold',
+        letterSpacing: 0.5,
     },
     cartSummaryPrice: {
-        ...Typography.body1,
-        color: Colors.text,
-        fontWeight: '700' as const,
+        ...Typography.h4,
+        color: Colors.textLight,
+        marginTop: 2,
+    },
+    cartSummaryArrow: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: 'rgba(255,255,255,0.2)',
+        alignItems: 'center',
+        justifyContent: 'center',
     },
 });

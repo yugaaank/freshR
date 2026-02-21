@@ -10,68 +10,81 @@ import {
     StyleSheet,
     Text,
     TouchableOpacity,
-    View
+    View,
+    Alert,
+    ActivityIndicator,
+    Dimensions
 } from 'react-native';
-import Animated, { FadeInUp } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useHybridStore } from '../../src/store/hybridStore';
-import { Colors, Radius, Spacing, Typography } from '../../src/theme';
+import dayjs from 'dayjs';
+import { useClub, useClubPosts } from '../../src/hooks/useClubs';
+import { useEvents } from '../../src/hooks/useEvents';
+import { useUserStore } from '../../src/store/userStore';
+import { Colors, Radius, Spacing, Typography, Palette } from '../../src/theme';
+
+const { width: SW } = Dimensions.get('window');
 
 export default function ClubProfileScreen() {
     const { id } = useLocalSearchParams<{ id: string }>();
-    const { getClubDetails, user, followClub } = useHybridStore();
-    const { club, events, posts } = useMemo(() => getClubDetails(id), [id, getClubDetails]);
+    
+    const { data: club, isLoading: clubLoading } = useClub(id);
+    const { data: allEvents = [], isLoading: eventsLoading } = useEvents({ clubId: id });
+    const { data: clubPosts = [], isLoading: postsLoading } = useClubPosts(id);
+    const { followedClubs, followClub } = useUserStore();
+
+    const isLoading = clubLoading || eventsLoading || postsLoading;
 
     const stats = useMemo(
         () => [
-            { label: 'Posts', value: posts.length },
-            { label: 'Followers', value: club?.followersCount ?? 0 },
-            { label: 'Events', value: events.length },
+            { label: 'Posts', value: clubPosts.length },
+            { label: 'Followers', value: club?.followers_count ?? 0 },
+            { label: 'Events', value: allEvents.length },
         ],
-        [posts.length, club?.followersCount, events.length]
+        [clubPosts.length, club?.followers_count, allEvents.length]
     );
+
+    if (isLoading) {
+        return (
+            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.background }}>
+                <ActivityIndicator color={Colors.primary} size="large" />
+            </View>
+        );
+    }
 
     if (!club) return null;
 
-    const isFollowing = user.followedClubs.includes(club.id);
-    const clubTypeLabel = club.vibeTag === 'Tech' ? 'Department' : 'Club';
-    const accountTone = `${clubTypeLabel} • ${club.vibeTag} Focus`;
-    const heroStory = posts[0];
+    const isFollowing = followedClubs.includes(club.id);
+    const clubTypeLabel = club.vibe_tag === 'Tech' ? 'Department' : 'Club';
+    const accountTone = `${club.vibe_tag} Community`;
+    const heroStory = clubPosts[0];
 
-    const gridPosts = posts.slice(0, 6);
+    const gridPosts = clubPosts.slice(0, 6);
 
     return (
         <View style={styles.flex}>
             <StatusBar barStyle="light-content" />
-            <SafeAreaView edges={['top']} style={styles.safe}>
-                <View style={styles.topNav}>
-                    <TouchableOpacity onPress={() => router.back()} style={styles.navBtn}>
-                        <Ionicons name="arrow-back" size={24} color={Colors.text} />
-                    </TouchableOpacity>
-                </View>
-            </SafeAreaView>
-
+            
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
-                <Animated.View style={styles.heroShell} entering={FadeInUp.springify()}>
+                <View style={styles.heroShell}>
                     <ImageBackground
                         source={{ uri: club.banner }}
                         style={styles.heroImage}
                         imageStyle={styles.heroImageStyle}
                     >
                         <LinearGradient
-                            colors={['rgba(0,0,0,0.9)', 'rgba(0,0,0,0.3)', 'rgba(250,250,250,0.0)']}
-                            locations={[0, 0.45, 1]}
+                            colors={['rgba(5,5,5,0.7)', 'rgba(5,5,5,0.2)', 'rgba(5,5,5,0.9)']}
                             style={styles.heroGradient}
                         />
-                        <View style={styles.heroTopBanners}>
-                            <View style={styles.heroBadge}>
-                                <Text style={styles.heroBadgeText}>Instagram</Text>
-                            </View>
-                            <View style={styles.heroBadgeSecondary}>
-                                <Text style={styles.heroBadgeTextSecondary}>{clubTypeLabel}</Text>
-                            </View>
-                        </View>
+                        <SafeAreaView edges={['top']} style={styles.topNav}>
+                            <TouchableOpacity onPress={() => router.back()} style={styles.navBtn}>
+                                <Ionicons name="arrow-back" size={22} color={Colors.textLight} />
+                            </TouchableOpacity>
+                        </SafeAreaView>
+                        
                         <View style={styles.heroTextBlock}>
+                            <View style={styles.heroBadgeSecondary}>
+                                <Text style={styles.heroBadgeTextSecondary}>{clubTypeLabel.toUpperCase()}</Text>
+                            </View>
                             <Text style={styles.heroName}>{club.name}</Text>
                             <Text style={styles.heroMeta}>{accountTone}</Text>
                         </View>
@@ -84,20 +97,22 @@ export default function ClubProfileScreen() {
                             </View>
                             <View style={styles.profileMeta}>
                                 <Text style={styles.profileName}>{club.name}</Text>
-                                <Text style={styles.profileTagline} numberOfLines={2}>
+                                <Text style={styles.profileTagline}>
                                     {club.tagline}
                                 </Text>
-                                <Text style={styles.profileTone}>{accountTone}</Text>
                             </View>
                         </View>
 
                         <View style={styles.statRow}>
-                            {stats.map((item) => (
-                                <View key={item.label} style={styles.statCell}>
-                                    <Text style={styles.statValue}>{item.value}</Text>
-                                    <Text style={styles.statLabel}>{item.label}</Text>
-                                </View>
-                            ))}
+                            {stats.map((item, idx) => {
+                                const colorPair = Palette[idx % Palette.length];
+                                return (
+                                    <View key={item.label} style={styles.statCell}>
+                                        <Text style={[styles.statValue, { color: colorPair.icon }]}>{item.value}</Text>
+                                        <Text style={styles.statLabel}>{item.label}</Text>
+                                    </View>
+                                );
+                            })}
                         </View>
 
                         <View style={styles.buttonRow}>
@@ -107,319 +122,156 @@ export default function ClubProfileScreen() {
                                 activeOpacity={0.8}
                             >
                                 <Text style={[styles.followBtnText, isFollowing && styles.followingBtnText]}>
-                                    {isFollowing ? 'Following' : 'Follow'}
+                                    {isFollowing ? 'Joined' : 'Join Club'}
                                 </Text>
                             </TouchableOpacity>
-                            <TouchableOpacity style={styles.outlineBtn} activeOpacity={0.8}>
-                                <Text style={styles.outlineBtnText}>Message</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity style={styles.iconBtn} activeOpacity={0.8}>
-                                <Ionicons name="share-social" size={18} color={Colors.textSecondary} />
+                            <TouchableOpacity style={styles.outlineBtn} activeOpacity={0.8} onPress={() => Alert.alert('Coming Soon', 'Community chat features are arriving soon!')}>
+                                <Text style={styles.outlineBtnText}>Community</Text>
                             </TouchableOpacity>
                         </View>
 
-                        <TouchableOpacity style={styles.bioCard} activeOpacity={0.8}>
-                            <Text style={styles.bioLabel}>Bio</Text>
-                            <Text style={styles.bioText}>{club.tagline} • {club.vibeTag} Stories & Events.</Text>
-                        </TouchableOpacity>
+                        {allEvents.length > 0 && (
+                            <View style={styles.section}>
+                                <View style={styles.gridHeader}>
+                                    <Text style={styles.gridTitle}>Upcoming Events</Text>
+                                </View>
+                                <View style={styles.eventList}>
+                                    {allEvents.map((event, idx) => {
+                                        const colorPair = Palette[(idx + 2) % Palette.length];
+                                        return (
+                                            <TouchableOpacity 
+                                                key={event.id} 
+                                                style={[styles.eventItem, { borderColor: colorPair.icon + '20' }]} 
+                                                onPress={() => router.push(`/event/${event.id}` as any)}
+                                            >
+                                                <View style={[styles.eventDateBox, { backgroundColor: colorPair.bg }]}>
+                                                    <Text style={[styles.eventDateMonth, { color: colorPair.icon }]}>{dayjs(event.date).format('MMM')}</Text>
+                                                    <Text style={[styles.eventDateDay, { color: colorPair.icon }]}>{dayjs(event.date).format('DD')}</Text>
+                                                </View>
+                                                <View style={styles.eventInfo}>
+                                                    <Text style={styles.eventTitle} numberOfLines={1}>{event.title}</Text>
+                                                    <Text style={styles.eventMeta}>{event.time} · {event.venue}</Text>
+                                                </View>
+                                                <Ionicons name="chevron-forward" size={18} color={Colors.textTertiary} />
+                                            </TouchableOpacity>
+                                        );
+                                    })}
+                                </View>
+                            </View>
+                        )}
 
                         <View style={styles.gridHeader}>
-                            <Text style={styles.gridTitle}>Recent Posts</Text>
-                            <Text style={styles.gridAction}>View all</Text>
+                            <Text style={styles.gridTitle}>Club Feed</Text>
+                            <TouchableOpacity onPress={() => router.push('/(tabs)/waves')}>
+                                <Text style={styles.gridAction}>View all</Text>
+                            </TouchableOpacity>
                         </View>
 
                         <View style={styles.gridList}>
                             {gridPosts.map((post) => (
-                                <TouchableOpacity key={post.id} style={styles.gridItem} activeOpacity={0.8}>
-                                    <Image source={{ uri: post.mediaUrl }} style={styles.gridImage} />
+                                <TouchableOpacity 
+                                    key={post.id} 
+                                    style={styles.gridItemWrap}
+                                    onPress={() => router.push('/(tabs)/waves')}
+                                >
+                                    <View style={styles.gridItem}>
+                                        <Image source={{ uri: post.media_url }} style={styles.gridImage} />
+                                    </View>
                                 </TouchableOpacity>
                             ))}
                         </View>
 
                         {heroStory && (
                             <View style={styles.featuredRow}>
-                                <Text style={styles.featuredLabel}>Featured Reel</Text>
-                                <View style={styles.featuredCard}>
-                                    <Image source={{ uri: heroStory.mediaUrl }} style={styles.featuredImage} />
-                                    <View style={styles.featuredOverlay}>
-                                        <Text style={styles.featuredCaption} numberOfLines={2}>
-                                            {heroStory.caption}
-                                        </Text>
+                                <Text style={styles.featuredLabel}>Club Spotlight</Text>
+                                <TouchableOpacity 
+                                    style={styles.featuredCardWrap}
+                                    onPress={() => {
+                                        if (heroStory.linked_event_id) {
+                                            router.push(`/event/${heroStory.linked_event_id}` as any);
+                                        } else {
+                                            router.push('/(tabs)/waves');
+                                        }
+                                    }}
+                                >
+                                    <View style={styles.featuredCard}>
+                                        <Image source={{ uri: heroStory.media_url }} style={styles.featuredImage} />
+                                        <View style={styles.featuredOverlay}>
+                                            <Text style={styles.featuredCaption} numberOfLines={2}>
+                                                {heroStory.caption}
+                                            </Text>
+                                            {heroStory.linked_event_id && (
+                                                <View style={styles.spotlightBadge}>
+                                                    <Text style={styles.spotlightBadgeText}>VIEW EVENT</Text>
+                                                </View>
+                                            )}
+                                        </View>
                                     </View>
-                                </View>
+                                </TouchableOpacity>
                             </View>
                         )}
                     </View>
-                </Animated.View>
+                </View>
             </ScrollView>
         </View>
     );
 }
 
 const styles = StyleSheet.create({
-    flex: { flex: 1, backgroundColor: '#FBFBFD' },
-    safe: { backgroundColor: Colors.background },
-    topNav: {
-        height: 60,
-        justifyContent: 'center',
-        paddingHorizontal: Spacing.section,
-    },
-    navBtn: {
-        width: 40,
-        height: 40,
-        borderRadius: 12,
-        justifyContent: 'center',
-        alignItems: 'center',
-        backgroundColor: '#FFF',
-        shadowColor: '#000',
-        shadowOpacity: 0.08,
-        shadowOffset: { width: 0, height: 3 },
-        shadowRadius: 8,
-        elevation: 3,
-    },
-    scroll: {
-        paddingBottom: 40,
-    },
-    heroShell: {
-        paddingBottom: Spacing.lg,
-    },
-    heroImage: {
-        width: '100%',
-        height: 220,
-        justifyContent: 'space-between',
-    },
-    heroImageStyle: {
-        opacity: 0.9,
-    },
-    heroGradient: {
-        ...StyleSheet.absoluteFillObject,
-    },
-    heroTopBanners: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        paddingHorizontal: Spacing.section,
-        paddingTop: Spacing.md,
-    },
-    heroBadge: {
-        paddingHorizontal: 12,
-        paddingVertical: 4,
-        borderRadius: Radius.xxl,
-        backgroundColor: 'rgba(255,255,255,0.2)',
-    },
-    heroBadgeText: {
-        ...Typography.mono,
-        color: '#FFF',
-        fontWeight: '600',
-    },
-    heroBadgeSecondary: {
-        paddingHorizontal: 12,
-        paddingVertical: 4,
-        borderRadius: Radius.xxl,
-        borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.3)',
-    },
-    heroBadgeTextSecondary: {
-        ...Typography.caption,
-        color: '#FFF',
-    },
-    heroTextBlock: {
-        paddingHorizontal: Spacing.section,
-        paddingBottom: Spacing.md,
-    },
-    heroName: {
-        ...Typography.h2,
-        color: '#FFF',
-    },
-    heroMeta: {
-        ...Typography.body2,
-        color: 'rgba(255,255,255,0.85)',
-    },
-    profileCard: {
-        backgroundColor: '#FFFFFF',
-        marginHorizontal: Spacing.section,
-        marginTop: -40,
-        borderRadius: Radius.xxl,
-        padding: Spacing.section,
-        shadowColor: '#000',
-        shadowOpacity: 0.05,
-        shadowOffset: { width: 0, height: 8 },
-        shadowRadius: 20,
-        elevation: 6,
-    },
-    profileTopRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: Spacing.md,
-    },
-    avatarRing: {
-        width: 90,
-        height: 90,
-        borderRadius: 45,
-        borderWidth: 3,
-        borderColor: '#FFE7CB',
-        justifyContent: 'center',
-        alignItems: 'center',
-        backgroundColor: '#FFF',
-        marginRight: Spacing.lg,
-    },
-    avatar: {
-        width: 74,
-        height: 74,
-        borderRadius: 37,
-    },
-    profileMeta: {
-        flex: 1,
-    },
-    profileName: {
-        ...Typography.h3,
-        fontWeight: '700',
-        marginBottom: 2,
-    },
-    profileTagline: {
-        ...Typography.body2,
-        color: Colors.textSecondary,
-    },
-    profileTone: {
-        ...Typography.caption,
-        marginTop: Spacing.xs,
-        color: Colors.textSecondary,
-        letterSpacing: 0.5,
-    },
-    statRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        marginBottom: Spacing.md,
-    },
-    statCell: {
-        alignItems: 'center',
-        flex: 1,
-    },
-    statValue: {
-        ...Typography.h4,
-        fontWeight: '700',
-    },
-    statLabel: {
-        ...Typography.caption,
-        color: Colors.textSecondary,
-    },
-    buttonRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        marginBottom: Spacing.md,
-    },
-    followBtn: {
-        flex: 1,
-        backgroundColor: Colors.primary,
-        paddingVertical: Spacing.md,
-        borderRadius: Radius.lg,
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginRight: Spacing.sm,
-    },
-    followingBtn: {
-        backgroundColor: '#1E1E1F',
-    },
-    followBtnText: {
-        ...Typography.label,
-        color: '#FFF',
-    },
-    followingBtnText: {
-        color: '#FFF',
-    },
-    outlineBtn: {
-        flex: 1,
-        borderWidth: 1,
-        borderColor: Colors.borderStrong,
-        borderRadius: Radius.lg,
-        paddingVertical: Spacing.md,
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginHorizontal: Spacing.xs,
-    },
-    outlineBtnText: {
-        ...Typography.label,
-        color: Colors.textSecondary,
-    },
-    iconBtn: {
-        width: 48,
-        height: 48,
-        borderRadius: Radius.xl,
-        borderWidth: 1,
-        borderColor: Colors.borderStrong,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    bioCard: {
-        backgroundColor: Colors.surface,
-        borderRadius: Radius.md,
-        padding: Spacing.md,
-        marginBottom: Spacing.md,
-    },
-    bioLabel: {
-        ...Typography.caption,
-        color: Colors.textSecondary,
-        marginBottom: Spacing.xs,
-    },
-    bioText: {
-        ...Typography.body2,
-        color: Colors.text,
-    },
-    gridHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: Spacing.sm,
-    },
-    gridTitle: {
-        ...Typography.h4,
-    },
-    gridAction: {
-        ...Typography.caption,
-        color: Colors.primary,
-    },
-    gridList: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        justifyContent: 'space-between',
-    },
-    gridItem: {
-        width: '32%',
-        height: 100,
-        marginBottom: Spacing.sm,
-        borderRadius: Radius.md,
-        overflow: 'hidden',
-    },
-    gridImage: {
-        width: '100%',
-        height: '100%',
-    },
-    featuredRow: {
-        marginTop: Spacing.md,
-    },
-    featuredLabel: {
-        ...Typography.caption,
-        color: Colors.textSecondary,
-        marginBottom: Spacing.xs,
-    },
-    featuredCard: {
-        borderRadius: Radius.xxl,
-        overflow: 'hidden',
-        height: 180,
-    },
-    featuredImage: {
-        width: '100%',
-        height: '100%',
-    },
-    featuredOverlay: {
-        ...StyleSheet.absoluteFillObject,
-        justifyContent: 'flex-end',
-        padding: Spacing.md,
-        backgroundColor: 'rgba(0,0,0,0.25)',
-    },
-    featuredCaption: {
-        ...Typography.body1,
-        color: '#FFF',
-        fontWeight: '600',
-    },
+    flex: { flex: 1, backgroundColor: Colors.background },
+    topNav: { flexDirection: 'row', paddingHorizontal: Spacing.lg, paddingTop: Spacing.sm },
+    navBtn: { width: 40, height: 40, borderRadius: Radius.md, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.glassDark, borderWidth: 0.5, borderColor: Colors.highlight },
+    scroll: { paddingBottom: 40 },
+    heroShell: { paddingBottom: Spacing.lg },
+    heroImage: { width: '100%', height: 280, justifyContent: 'space-between' },
+    heroImageStyle: { opacity: 1 },
+    heroGradient: { ...StyleSheet.absoluteFillObject },
+    heroBadgeSecondary: { alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 4, borderRadius: Radius.sm, backgroundColor: Colors.primary, marginBottom: 8 },
+    heroBadgeTextSecondary: { ...Typography.micro, color: Colors.textLight, fontFamily: 'Sora_700Bold' },
+    heroTextBlock: { paddingHorizontal: Spacing.section, paddingBottom: 60 },
+    heroName: { ...Typography.h1, color: Colors.textLight },
+    heroMeta: { ...Typography.body2, color: Colors.textDimmed, fontFamily: 'Sora_600SemiBold' },
+    profileCard: { backgroundColor: Colors.sectionBg, marginHorizontal: Spacing.section, marginTop: -40, borderRadius: Radius.xxl, padding: Spacing.lg, borderWidth: 0.5, borderColor: Colors.divider },
+    profileTopRow: { flexDirection: 'row', alignItems: 'center', marginBottom: Spacing.lg },
+    avatarRing: { width: 84, height: 84, borderRadius: 42, borderWidth: 3, borderColor: Colors.surface, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.surface, marginRight: Spacing.md },
+    avatar: { width: 74, height: 74, borderRadius: 37 },
+    profileMeta: { flex: 1 },
+    profileName: { ...Typography.h3, color: Colors.text },
+    profileTagline: { ...Typography.body2, color: Colors.textSecondary, lineHeight: 20 },
+    statRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: Spacing.xl, backgroundColor: Colors.surface, padding: Spacing.md, borderRadius: Radius.xl, borderWidth: 0.5, borderColor: Colors.divider },
+    statCell: { alignItems: 'center', flex: 1 },
+    statValue: { ...Typography.h4, fontFamily: 'Sora_700Bold' },
+    statLabel: { ...Typography.micro, color: Colors.textSecondary, textTransform: 'uppercase', marginTop: 2 },
+    buttonRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, marginBottom: Spacing.xl },
+    followBtn: { flex: 1, backgroundColor: Colors.primary, paddingVertical: 14, borderRadius: Radius.lg, alignItems: 'center' },
+    followingBtn: { backgroundColor: Colors.success },
+    followBtnText: { ...Typography.h5, color: Colors.textLight, fontFamily: 'Sora_700Bold' },
+    followingBtnText: { color: Colors.textLight },
+    outlineBtn: { flex: 1, borderWidth: 1.5, borderColor: Colors.divider, borderRadius: Radius.lg, paddingVertical: 14, alignItems: 'center', backgroundColor: Colors.surface },
+    outlineBtnText: { ...Typography.h5, color: Colors.text, fontFamily: 'Sora_600SemiBold' },
+    gridHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.md },
+    gridTitle: { ...Typography.h4, color: Colors.text },
+    gridAction: { ...Typography.micro, color: Colors.primary, fontFamily: 'Sora_700Bold' },
+    section: { marginBottom: Spacing.xl },
+    eventList: { gap: 12 },
+    eventItem: { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.surface, padding: 10, borderRadius: Radius.lg, gap: 12, borderWidth: 0.5 },
+    eventDateBox: { width: 44, height: 44, borderRadius: Radius.md, alignItems: 'center', justifyContent: 'center' },
+    eventDateMonth: { ...Typography.micro, fontFamily: 'Sora_700Bold', textTransform: 'uppercase' },
+    eventDateDay: { ...Typography.h4, fontFamily: 'Sora_700Bold' },
+    eventInfo: { flex: 1, gap: 2 },
+    eventTitle: { ...Typography.body1, fontFamily: 'Sora_600SemiBold', color: Colors.text },
+    eventMeta: { ...Typography.micro, color: Colors.textSecondary },
+    gridList: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', gap: 8 },
+    gridItemWrap: { width: (SW - Spacing.section * 2 - 40) / 3, aspectRatio: 1 },
+    gridItem: { flex: 1, borderRadius: Radius.md, overflow: 'hidden', borderWidth: 0.5, borderColor: Colors.divider },
+    gridImage: { width: '100%', height: '100%' },
+    featuredRow: { marginTop: Spacing.xl },
+    featuredLabel: { ...Typography.h4, color: Colors.text, marginBottom: Spacing.md },
+    featuredCardWrap: { height: 200 },
+    featuredCard: { flex: 1, borderRadius: Radius.xl, overflow: 'hidden', borderWidth: 0.5, borderColor: Colors.divider },
+    featuredImage: { width: '100%', height: '100%' },
+    featuredOverlay: { ...StyleSheet.absoluteFillObject, justifyContent: 'flex-end', padding: Spacing.md, backgroundColor: 'rgba(5,5,5,0.4)' },
+    featuredCaption: { ...Typography.body1, color: Colors.textLight, fontFamily: 'Sora_600SemiBold' },
+    spotlightBadge: { position: 'absolute', top: Spacing.md, right: Spacing.md, backgroundColor: Colors.primary, paddingHorizontal: 8, paddingVertical: 4, borderRadius: Radius.xs },
+    spotlightBadgeText: { ...Typography.micro, fontFamily: 'Sora_800ExtraBold', color: Colors.textLight },
 });

@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "hackathon",
-    "slug": "hackathon",
+    "name": "FreshR",
+    "slug": "freshr",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "hackathon",
+    "scheme": "freshr",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
@@ -40,7 +40,8 @@
           }
         }
       ],
-      "expo-secure-store"
+      "expo-secure-store",
+      "@react-native-community/datetimepicker"
     ],
     "experiments": {
       "typedRoutes": true,

@@ -7,9 +7,13 @@ import {
     Text,
     TouchableOpacity,
     View,
+    Alert
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useCartStore } from '../../src/store/cartStore';
+import { useUserStore } from '../../src/store/userStore';
+import QRCode from 'react-native-qrcode-svg';
+import * as Haptics from 'expo-haptics';
 import { Colors, Radius, Spacing, Typography } from '../../src/theme';
 
 function createPaymentCode() {
@@ -18,21 +22,46 @@ function createPaymentCode() {
 
 export default function CartScreen() {
     const cart = useCartStore();
+    const { authUser } = useUserStore();
     const [qrCode, setQrCode] = useState<string | null>(null);
     const [collected, setCollected] = useState(false);
 
     const items = cart.items;
     const total = useMemo(() => cart.totalPrice(), [cart]);
 
-    const handlePay = () => {
+    const handlePay = async () => {
         if (!items.length) return;
-        setCollected(false);
-        setQrCode(createPaymentCode());
+        
+        try {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            
+            // Use real auth ID, fallback to seeded demo user for hackathon stability
+            const userId = authUser?.id ?? '11111111-1111-1111-1111-111111111111';
+            
+            console.log('Attempting checkout for user:', userId);
+            const orderId = await cart.checkout(userId);
+            
+            setQrCode(createPaymentCode());
+            setCollected(false);
+            
+            Alert.alert("Payment Successful", "Your order has been placed!", [
+                { text: "Track Order", onPress: () => {
+                    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                    router.push({ pathname: '/order-tracking', params: { orderId } });
+                }}
+            ]);
+        } catch (error: any) {
+            console.error('Checkout failed:', error);
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+            Alert.alert("Error", `Failed to process payment: ${error.message || 'Unknown error'}`);
+        }
     };
 
     const handleCollected = () => {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         cart.clearCart();
         setCollected(true);
+        router.replace('/(tabs)/food');
     };
 
     return (
@@ -66,7 +95,12 @@ export default function CartScreen() {
                     <View style={styles.qrCard}>
                         <Text style={styles.qrLabel}>Show this QR at collection</Text>
                         <View style={styles.qrCode}>
-                            <Text style={styles.qrText}>{qrCode}</Text>
+                            <QRCode
+                                value={qrCode}
+                                size={180}
+                                color={Colors.text}
+                                backgroundColor="transparent"
+                            />
                         </View>
                         {collected ? (
                             <Text style={styles.scannedText}>Collection confirmed.</Text>
@@ -169,7 +203,8 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     payBtnDisabled: {
-        backgroundColor: '#A7DCC1',
+        backgroundColor: Colors.border,
+        opacity: 0.5,
     },
     payBtnText: {
         ...Typography.body1,
@@ -194,16 +229,12 @@ const styles = StyleSheet.create({
         width: 220,
         height: 220,
         borderRadius: Radius.xxl,
-        backgroundColor: '#111',
+        backgroundColor: '#FFF', // Changed to white for better QR contrast
         alignItems: 'center',
         justifyContent: 'center',
         marginBottom: Spacing.md,
-    },
-    qrText: {
-        ...Typography.body2,
-        color: '#fff',
-        letterSpacing: 1.2,
-        textAlign: 'center',
+        borderWidth: 1,
+        borderColor: Colors.divider,
     },
     scannedBtn: {
         backgroundColor: Colors.success,

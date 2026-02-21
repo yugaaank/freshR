@@ -1,21 +1,23 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View, Alert, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import Animated, { FadeInDown } from 'react-native-reanimated';
-import { Colors, Radius, Shadows, Spacing, Typography } from '../src/theme';
+import { useUserStore } from '../src/store/userStore';
+import { Colors, Radius, Spacing, Typography, Palette } from '../src/theme';
 
 const QUICK_ACCESS = [
-  { id: 'grades', label: 'Grades', meta: 'View GPA & transcripts', icon: 'school' },
-  { id: 'attendance', label: 'Attendance', meta: 'See lecture presence', icon: 'checkmark-done' },
-  { id: 'orders', label: 'Food Orders', meta: 'Past & upcoming pickups', icon: 'fast-food' },
-  { id: 'stationery', label: 'Stationery Requests', meta: 'Track print & copy jobs', icon: 'print' },
-  { id: 'events', label: 'Campus Events', meta: "Browse what's running", icon: 'megaphone' },
-  { id: 'support', label: 'Student Support', meta: 'Raise a ticket or chat', icon: 'chatbox-ellipses' },
+  { id: 'grades', label: 'Grades', meta: 'GPA & transcripts', icon: 'school' },
+  { id: 'attendance', label: 'Attendance', meta: 'Lecture presence', icon: 'checkmark-done' },
+  { id: 'orders', label: 'Food Orders', meta: 'Previous & active', icon: 'fast-food' },
+  { id: 'stationery', label: 'PDF & Print', meta: 'History & requests', icon: 'print' },
+  { id: 'id-card', label: 'Digital ID', meta: 'Official campus QR', icon: 'card' },
+  { id: 'library', label: 'Library', meta: 'Issued books & fines', icon: 'library' },
 ];
 
 export default function ProfileScreen() {
+  const { profile } = useUserStore();
+
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <View style={styles.header}>
@@ -24,36 +26,57 @@ export default function ProfileScreen() {
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Student Hub</Text>
       </View>
-      <Animated.View entering={FadeInDown.springify()} style={styles.hero}>
-        <Text style={styles.heroTitle}>Hey Yugan</Text>
-        <Text style={styles.heroSubtitle}>Everything you need to stay on top of campus life.</Text>
-      </Animated.View>
+      <View style={styles.hero}>
+        <View style={styles.heroRow}>
+          <View style={styles.heroInfo}>
+            <Text style={styles.heroTitle}>Hey {profile?.name?.split(' ')[0] ?? 'Yugank'}</Text>
+            <Text style={styles.heroSubtitle}>{profile?.branch} · Year {profile?.year}</Text>
+          </View>
+          <View style={styles.heroAvatarWrap}>
+            <Image source={{ uri: profile?.avatar_url ?? 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200&h=200&fit=crop' }} style={styles.heroAvatar} />
+          </View>
+        </View>
+      </View>
       <ScrollView contentContainerStyle={styles.scroll}>
-        <Text style={styles.sectionTitle}>Quick Access</Text>
+        <Text style={styles.sectionTitle}>Essential Services</Text>
         <View style={styles.grid}>
-          {QUICK_ACCESS.map((card) => (
-            <TouchableOpacity
-              key={card.id}
-              style={styles.card}
-              activeOpacity={0.85}
-              onPress={() => {
-              if (card.id === 'grades') router.push('/grades');
-                else if (card.id === 'attendance') router.push('/attendance');
-                else if (card.id === 'orders') router.push('/food-orders');
-                else if (card.id === 'stationery') router.push('/stationery-orders');
-                else if (card.id === 'events') router.push('/(tabs)/explore');
-                else if (card.id === 'support') router.push('/teachers');
-              }}
-            >
-              <View style={styles.iconWrap}>
-                <Ionicons name={card.icon as any} size={20} color={Colors.primary} />
-              </View>
-              <Text style={styles.cardTitle}>{card.label}</Text>
-              <Text style={styles.cardMeta}>{card.meta}</Text>
-            </TouchableOpacity>
-          ))}
+          {QUICK_ACCESS.map((card, idx) => {
+            return (
+              <TouchableOpacity
+                key={card.id}
+                style={[styles.card, { backgroundColor: Colors.card }]}
+                activeOpacity={0.85}
+                onPress={() => {
+                  if (card.id === 'grades') router.push('/grades');
+                  else if (card.id === 'attendance') router.push('/attendance');
+                  else if (card.id === 'orders') router.push('/food-orders');
+                  else if (card.id === 'stationery') router.push('/stationery-orders');
+                  else if (card.id === 'events') router.push('/(tabs)/explore');
+                  else Alert.alert('Coming Soon', `${card.label} feature is arriving in the next update!`);
+                }}
+              >
+                <View style={[styles.iconWrap, { backgroundColor: Colors.secondary }]}>
+                  <Ionicons name={card.icon as any} size={20} color={Colors.primary} />
+                </View>
+                <Text style={[styles.cardTitle, { color: Colors.foreground }]}>{card.label}</Text>
+                <Text style={[styles.cardMeta, { color: Colors.mutedForeground }]}>{card.meta}</Text>
+              </TouchableOpacity>
+            );
+          })}
         </View>
       </ScrollView>
+
+      <View style={styles.footer}>
+        <TouchableOpacity style={styles.logoutBtn} onPress={() => {
+          Alert.alert('Logout', 'Are you sure you want to sign out?', [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Logout', style: 'destructive', onPress: () => useUserStore.getState().signOut() }
+          ]);
+        }}>
+          <Ionicons name="log-out-outline" size={20} color={Colors.error} />
+          <Text style={styles.logoutText}>Sign Out</Text>
+        </TouchableOpacity>
+      </View>
     </SafeAreaView>
   );
 }
@@ -66,30 +89,61 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.section,
     paddingVertical: Spacing.sm,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
+    borderBottomColor: Colors.divider,
   },
   backBtn: {
-    padding: Spacing.xs,
+    width: 40,
+    height: 40,
+    borderRadius: Radius.md,
+    backgroundColor: Colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
     marginRight: Spacing.md,
+    borderWidth: 0.5,
+    borderColor: Colors.divider,
   },
   headerTitle: {
     ...Typography.h3,
+    color: Colors.text,
   },
   hero: {
     margin: Spacing.section,
-    borderRadius: Radius.xxl,
+    borderRadius: Radius.lg,
     padding: Spacing.lg,
-    backgroundColor: Colors.primary,
-    ...Shadows.lg,
+    backgroundColor: Colors.secondary,
+    borderWidth: 0.5,
+    borderColor: Colors.border,
+  },
+  heroRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  heroInfo: {
+    flex: 1,
+  },
+  heroAvatarWrap: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    borderWidth: 1.5,
+    borderColor: Colors.primary,
+    padding: 2,
+    backgroundColor: Colors.background,
+  },
+  heroAvatar: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 28,
   },
   heroTitle: {
     ...Typography.h2,
-    color: '#FFF',
+    color: Colors.foreground,
   },
   heroSubtitle: {
     marginTop: Spacing.xs,
     ...Typography.body2,
-    color: 'rgba(255,255,255,0.9)',
+    color: Colors.textSecondary,
   },
   scroll: {
     paddingHorizontal: Spacing.section,
@@ -97,6 +151,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     ...Typography.h4,
+    color: Colors.text,
     marginBottom: Spacing.sm,
   },
   grid: {
@@ -106,27 +161,46 @@ const styles = StyleSheet.create({
   },
   card: {
     width: '48%',
-    backgroundColor: Colors.cardBg,
     borderRadius: Radius.xl,
     padding: Spacing.md,
     marginBottom: Spacing.sm,
-    ...Shadows.sm,
+    backgroundColor: Colors.card,
+    borderWidth: 0.5,
+    borderColor: Colors.border,
   },
   iconWrap: {
     width: 40,
     height: 40,
     borderRadius: Radius.lg,
-    backgroundColor: Colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: Spacing.sm,
   },
   cardTitle: {
     ...Typography.h5,
+    fontFamily: 'Sora_600SemiBold',
   },
   cardMeta: {
     ...Typography.caption,
-    color: Colors.textSecondary,
-    marginTop: Spacing.xs,
+    marginTop: 4,
+  },
+  footer: {
+    padding: Spacing.section,
+    borderTopWidth: 1,
+    borderTopColor: Colors.divider,
+  },
+  logoutBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    paddingVertical: 14,
+    borderRadius: Radius.lg,
+    backgroundColor: Colors.error + '10',
+  },
+  logoutText: {
+    ...Typography.h5,
+    color: Colors.error,
+    fontFamily: 'Sora_700Bold',
   },
 });

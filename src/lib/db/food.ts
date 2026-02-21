@@ -11,8 +11,8 @@ export async function getRestaurants(): Promise<Restaurant[]> {
 }
 
 export async function getMenuItems(restaurantId: string, category?: string): Promise<MenuItemRow[]> {
-    let query = supabase.from('menu_items').select('*')
-        .eq('restaurant_id', restaurantId).eq('is_available', true);
+    let query = supabase.from('menu_items').select('*').eq('is_available', true);
+    if (restaurantId) query = query.eq('restaurant_id', restaurantId);
     if (category && category !== 'All') query = query.eq('category', category);
     const { data, error } = await query.order('is_popular', { ascending: false });
     if (error) throw error;
@@ -31,5 +31,5 @@ export async function getMenuCategories(restaurantId: string): Promise<string[]>
         .from('menu_items').select('category').eq('restaurant_id', restaurantId).eq('is_available', true);
     if (error) throw error;
     const cats = [...new Set(((data ?? []) as any[]).map((r) => r.category as string))];
-    return ['All', ...cats];
+    return cats;
 }

@@ -18,18 +18,24 @@ export async function getClubs(): Promise<Club[]> {
 }
 
 export async function getClubById(id: string): Promise<ClubWithEvents | null> {
-    const [clubRes, eventsRes, postsRes] = await Promise.all([
-        supabase.from('clubs').select('*').eq('id', id).single(),
-        supabase.from('events').select('*').eq('club_id', id).order('date', { ascending: true }),
-        supabase.from('club_posts').select('*').eq('club_id', id).order('created_at', { ascending: false }),
-    ]);
-    if (clubRes.error) throw clubRes.error;
-    if (!clubRes.data) return null;
-    return {
-        ...(clubRes.data as Club),
-        events: (eventsRes.data ?? []) as DBEvent[],
-        posts: (postsRes.data ?? []) as ClubPost[],
-    };
+    if (!id || id === 'undefined' || id.length < 30) return null;
+    
+    try {
+        const [clubRes, eventsRes, postsRes] = await Promise.all([
+            supabase.from('clubs').select('*').eq('id', id).single(),
+            supabase.from('events').select('*').eq('club_id', id).order('date', { ascending: true }),
+            supabase.from('club_posts').select('*').eq('club_id', id).order('created_at', { ascending: false }),
+        ]);
+        if (clubRes.error) return null;
+        if (!clubRes.data) return null;
+        return {
+            ...(clubRes.data as Club),
+            events: (eventsRes.data ?? []) as DBEvent[],
+            posts: (postsRes.data ?? []) as ClubPost[],
+        };
+    } catch (e) {
+        return null;
+    }
 }
 
 export async function getClubPosts(clubId: string): Promise<ClubPost[]> {

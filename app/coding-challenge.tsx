@@ -14,39 +14,24 @@ import Card from '../src/components/ui/Card';
 import SectionHeader from '../src/components/ui/SectionHeader';
 import StreakGrid from '../src/components/ui/StreakGrid';
 import TagPill from '../src/components/ui/TagPill';
-import { StreakDay } from '../src/data/challenges';
 import {
     usePastChallenges,
     useTodayChallenge,
     useUserStreak,
 } from '../src/hooks/useChallenges';
 import { Challenge } from '../src/lib/types/database.types';
-import { Colors, Radius, Shadows, Spacing, Typography } from '../src/theme';
-
-/** Demo user ID — swap for auth user when ready */
-const DEMO_USER_ID = '11111111-1111-1111-1111-111111111111';
-
-/** Build a 52-week streak grid from past challenge dates (stub: random for now) */
-function buildStreakData(): StreakDay[] {
-    const days: StreakDay[] = [];
-    const today = new Date();
-    for (let i = 364; i >= 0; i--) {
-        const d = new Date(today);
-        d.setDate(d.getDate() - i);
-        days.push({
-            date: d.toISOString().split('T')[0],
-            solved: Math.random() > 0.65 ? Math.floor(Math.random() * 4) + 1 : 0,
-            isToday: i === 0,
-        });
-    }
-    return days;
-}
-const streakData = buildStreakData();
+import { useUserStore } from '../src/store/userStore';
+import { useChallengeStore } from '../src/store/challengeStore';
+import { Colors, Radius, Spacing, Typography } from '../src/theme';
 
 export default function CodingChallengeScreen() {
+    const { profile } = useUserStore();
+    const userId = profile?.id ?? '';
+    
     const { data: todayChallenge, isLoading: dayLoading } = useTodayChallenge();
     const { data: pastChallenges = [], isLoading: pastLoading } = usePastChallenges();
-    const { data: streak } = useUserStreak(DEMO_USER_ID);
+    const { data: streak } = useUserStreak(userId);
+    const { streakData } = useChallengeStore();
 
     const currentStreak = streak?.current_streak ?? 0;
     const longestStreak = streak?.longest_streak ?? 0;
@@ -67,7 +52,6 @@ export default function CodingChallengeScreen() {
     return (
         <SafeAreaView style={styles.safe} edges={['top']}>
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
-                {/* ═══ HEADER ═══ */}
                 <View style={styles.header}>
                     <TouchableOpacity onPress={() => router.back()} activeOpacity={0.88}>
                         <Ionicons name="arrow-back" size={22} color={Colors.text} />
@@ -76,24 +60,20 @@ export default function CodingChallengeScreen() {
                     <View style={{ width: 22 }} />
                 </View>
 
-                {/* ═══ STREAK STATS ═══ */}
                 <View style={styles.streakBanner}>
-                    <View style={[styles.deco, { width: 120, height: 120, top: -40, right: -20, backgroundColor: Colors.accent, opacity: 0.12 }]} />
-                    <View style={[styles.deco, { width: 70, height: 70, bottom: -20, left: 40, backgroundColor: Colors.primary, opacity: 0.12 }]} />
                     {[
                         { emoji: '🔥', value: `${currentStreak}`, label: 'Current Streak', unit: 'days' },
                         { emoji: '⚡', value: `${longestStreak}`, label: 'Longest', unit: 'days' },
                         { emoji: '✅', value: `${totalSolved}`, label: 'Total Solved', unit: 'problems' },
                     ].map((stat) => (
                         <View key={stat.label} style={styles.streakStat}>
-                            <Text style={styles.statEmoji}>{stat.emoji}</Text>
+                            <Text style={stat.unit === 'problems' ? styles.statEmojiLarge : styles.statEmoji}>{stat.emoji}</Text>
                             <Text style={styles.statValue}>{stat.value}</Text>
                             <Text style={styles.statLabel}>{stat.label}</Text>
                         </View>
                     ))}
                 </View>
 
-                {/* ═══ TODAY'S PROBLEM ═══ */}
                 {todayChallenge ? (
                     <>
                         <SectionHeader title="Today's Problem" subtitle={todayChallenge.date} style={{ marginTop: Spacing.xl }} />
@@ -105,9 +85,8 @@ export default function CodingChallengeScreen() {
                     </View>
                 )}
 
-                {/* ═══ STREAK GRID ═══ */}
                 <SectionHeader title="Your Streak" subtitle="Past year" style={{ marginTop: Spacing.xl }} />
-                <Card style={styles.streakCard} shadow="xs">
+                <Card style={styles.streakCard}>
                     <StreakGrid data={streakData} />
                     <View style={styles.legendRow}>
                         <Text style={styles.legendText}>Less</Text>
@@ -118,11 +97,10 @@ export default function CodingChallengeScreen() {
                     </View>
                 </Card>
 
-                {/* ═══ PAST CHALLENGES ═══ */}
                 <SectionHeader title="Recent Challenges" style={{ marginTop: Spacing.xl }} />
                 <View style={styles.pastList}>
                     {pastChallenges.slice(0, 10).map((c: Challenge) => (
-                        <Card key={c.id} style={styles.pastCard} padding={Spacing.md} shadow="xs">
+                        <Card key={c.id} style={styles.pastCard} padding={Spacing.md}>
                             <View style={styles.pastRow}>
                                 <View style={styles.pastLeft}>
                                     <Text style={styles.pastTitle}>{c.title}</Text>
@@ -154,7 +132,7 @@ export default function CodingChallengeScreen() {
 function ChallengeCard({ challenge }: { challenge: Challenge }) {
     const examples = (challenge.examples as any[]) ?? [];
     return (
-        <Card style={styles.problemCard} shadow="md">
+        <Card style={styles.problemCard}>
             <View style={styles.problemTop}>
                 <Text style={styles.problemTitle}>{challenge.title}</Text>
                 <View style={[
@@ -200,13 +178,13 @@ const styles = StyleSheet.create({
     headerTitle: { ...Typography.h3, color: Colors.text },
     noProblem: { alignItems: 'center', paddingVertical: Spacing.xl },
     noProblemText: { ...Typography.body1, color: Colors.textSecondary },
-    streakBanner: { flexDirection: 'row', backgroundColor: Colors.darkBg, marginHorizontal: Spacing.section, borderRadius: Radius.xl, padding: Spacing.xl, gap: 4, overflow: 'hidden', borderTopWidth: 1, borderTopColor: Colors.highlight, ...Shadows.md },
-    deco: { position: 'absolute', borderRadius: 9999 },
+    streakBanner: { flexDirection: 'row', backgroundColor: Colors.darkBg, marginHorizontal: Spacing.section, borderRadius: Radius.xl, padding: Spacing.xl, gap: 4, overflow: 'hidden', borderTopWidth: 1, borderTopColor: Colors.highlight },
     streakStat: { flex: 1, alignItems: 'center', gap: 4 },
     statEmoji: { fontSize: 24 },
+    statEmojiLarge: { fontSize: 24 },
     statValue: { ...Typography.h2, color: '#FFF' },
     statLabel: { ...Typography.micro, color: 'rgba(255,255,255,0.5)', textAlign: 'center', letterSpacing: 0.3 },
-    problemCard: { marginHorizontal: Spacing.section, gap: Spacing.md },
+    problemCard: { marginHorizontal: Spacing.section, gap: Spacing.md, borderWidth: 0.5, borderColor: Colors.divider },
     problemTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: Spacing.sm },
     problemTitle: { ...Typography.h3, color: Colors.text, flex: 1, letterSpacing: -0.3 },
     diffBadge: { paddingHorizontal: Spacing.sm, paddingVertical: 4, borderRadius: Radius.pill },
@@ -222,14 +200,14 @@ const styles = StyleSheet.create({
     statsRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
     stat: { ...Typography.caption, color: Colors.textSecondary },
     statDot: { width: 3, height: 3, borderRadius: 2, backgroundColor: Colors.textTertiary },
-    solveBtn: { backgroundColor: Colors.accent, borderRadius: Radius.pill, paddingVertical: Spacing.md, alignItems: 'center', ...Shadows.colored(Colors.accent) },
+    solveBtn: { backgroundColor: Colors.accent, borderRadius: Radius.pill, paddingVertical: Spacing.md, alignItems: 'center' },
     solveBtnText: { ...Typography.h5, color: '#FFF', fontWeight: '700' as const },
-    streakCard: { marginHorizontal: Spacing.section },
+    streakCard: { marginHorizontal: Spacing.section, borderWidth: 0.5, borderColor: Colors.divider },
     legendRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: Spacing.sm },
     legendText: { ...Typography.micro, color: Colors.textTertiary },
     legendDot: { width: 11, height: 11, borderRadius: 2 },
     pastList: { paddingHorizontal: Spacing.section, gap: 8 },
-    pastCard: {},
+    pastCard: { borderWidth: 0.5, borderColor: Colors.divider },
     pastRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
     pastLeft: { flex: 1, gap: 6 },
     pastTitle: { ...Typography.h5, color: Colors.text },
