@@ -1,64 +1,58 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
 import { useEffect } from 'react';
-import { Platform, StyleSheet, Text, View } from 'react-native';
-import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
+import { Platform, StyleSheet, View } from 'react-native';
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring
+} from 'react-native-reanimated';
 import { useCartStore } from '../../src/store/cartStore';
-import { Colors, Spacing, Typography } from '../../src/theme';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Colors } from '../../src/theme';
 
 interface TabIconProps {
   name: React.ComponentProps<typeof Ionicons>['name'];
-  label: string;
   focused: boolean;
   badge?: number;
 }
 
-function TabIcon({ name, label, focused, badge }: TabIconProps) {
-  const bgOpacity = useSharedValue(focused ? 1 : 0);
-  const scale = useSharedValue(focused ? 1 : 0.8);
-
-  useEffect(() => {
-    bgOpacity.value = withSpring(focused ? 1 : 0, { damping: 15, stiffness: 300 });
-    scale.value = withSpring(focused ? 1 : 0.8, { damping: 15, stiffness: 300 });
-  }, [focused, bgOpacity, scale]);
-
-  const bgStyle = useAnimatedStyle(() => ({
-    opacity: bgOpacity.value,
-    transform: [{ scale: scale.value }],
-  }));
-
+function TabIcon({ name, focused }: TabIconProps) {
   return (
-    <View style={styles.iconWrap}>
-      <Animated.View style={[styles.activeBg, bgStyle]} />
-      <View style={styles.iconContainer}>
-        <Ionicons name={name} size={22} color={focused ? Colors.primary : Colors.textTertiary} />
-        {badge ? (
-          <View style={styles.badge}>
-            <Text style={styles.badgeText}>{badge > 99 ? '99+' : badge}</Text>
-          </View>
-        ) : null}
-      </View>
-      <Text style={[styles.tabLabel, focused && styles.tabLabelFocused]} numberOfLines={1}>{label}</Text>
-    </View>
+    <Animated.View style={[styles.navIconWrapper, focused && styles.navIconWrapperActive]}>
+      <Ionicons
+        name={name}
+        size={22}
+        color={focused ? '#0A0B10' : '#B7BDC6'}
+      />
+    </Animated.View>
   );
 }
 
 export default function TabsLayout() {
   const cartCount = useCartStore((s) => s.totalItems());
+  const insets = useSafeAreaInsets();
+  const baseBottom = Platform.OS === 'ios' ? 16 : 10;
 
   return (
-    <Tabs
-      screenOptions={{
-        headerShown: false,
-        tabBarStyle: styles.tabBar,
-        tabBarShowLabel: false,
-      }}
-    >
+      <Tabs
+        screenOptions={{
+          headerShown: false,
+          tabBarStyle: [styles.tabBar, { paddingBottom: insets.bottom || 8 }],
+          tabBarShowLabel: false,
+          tabBarItemStyle: {
+            height: '100%',
+            justifyContent: 'center',
+            alignItems: 'center',
+            marginTop: 10,
+          },
+        }}
+      >
       <Tabs.Screen
         name="index"
         options={{
           tabBarIcon: ({ focused }) => (
-            <TabIcon name={focused ? 'home' : 'home-outline'} label="Home" focused={focused} />
+            <TabIcon name={focused ? 'home' : 'home-outline'} focused={focused} />
           ),
         }}
       />
@@ -66,7 +60,7 @@ export default function TabsLayout() {
         name="waves"
         options={{
           tabBarIcon: ({ focused }) => (
-            <TabIcon name={focused ? 'play-circle' : 'play-circle-outline'} label="Waves" focused={focused} />
+            <TabIcon name={focused ? 'play' : 'play-outline'} focused={focused} />
           ),
         }}
       />
@@ -74,7 +68,7 @@ export default function TabsLayout() {
         name="explore"
         options={{
           tabBarIcon: ({ focused }) => (
-            <TabIcon name={focused ? 'compass' : 'compass-outline'} label="Explore" focused={focused} />
+            <TabIcon name={focused ? 'compass' : 'compass-outline'} focused={focused} />
           ),
         }}
       />
@@ -82,12 +76,7 @@ export default function TabsLayout() {
         name="food"
         options={{
           tabBarIcon: ({ focused }) => (
-            <TabIcon
-              name={focused ? 'bag' : 'bag-outline'}
-              label="Food"
-              focused={focused}
-              badge={cartCount > 0 ? cartCount : undefined}
-            />
+            <TabIcon name={focused ? 'fast-food' : 'fast-food-outline'} focused={focused} />
           ),
         }}
       />
@@ -95,7 +84,7 @@ export default function TabsLayout() {
         name="calendar"
         options={{
           tabBarIcon: ({ focused }) => (
-            <TabIcon name={focused ? 'calendar' : 'calendar-outline'} label="Cal" focused={focused} />
+            <TabIcon name={focused ? 'calendar' : 'calendar-outline'} focused={focused} />
           ),
         }}
       />
@@ -105,42 +94,31 @@ export default function TabsLayout() {
 
 const styles = StyleSheet.create({
   tabBar: {
-    backgroundColor: Colors.cardBg,
-    borderTopWidth: 1,
-    borderTopColor: '#E8E8E8',
-    height: Platform.OS === 'ios' ? 88 : 68,
-    paddingTop: Spacing.sm,
-    paddingBottom: Platform.OS === 'ios' ? Spacing.xl : Spacing.sm,
-    elevation: 8,
-    shadowOpacity: 0,
+    height: 90,
+    borderTopWidth: 0,
+    backgroundColor: '#111216',
+    borderTopLeftRadius: 0,
+    borderTopRightRadius: 0,
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
+    paddingTop: 6,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#020202',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 14,
+    elevation: 16,
   },
-  iconWrap: { alignItems: 'center', gap: 2, width: 58, position: 'relative' },
-  iconContainer: { position: 'relative' },
-  badge: {
-    position: 'absolute',
-    top: -4,
-    right: -8,
-    backgroundColor: Colors.error,
-    borderRadius: 8,
-    minWidth: 16,
-    height: 16,
+  navIconWrapper: {
+    width: 44,
+    height: 44,
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 3,
-    borderWidth: 1.5,
-    borderColor: Colors.cardBg,
+    backgroundColor: 'transparent',
   },
-  badgeText: { color: '#FFF', fontSize: 9, fontWeight: '700' },
-  tabLabel: { ...Typography.micro, color: Colors.textTertiary, marginTop: 2, zIndex: 1 },
-  tabLabelFocused: { color: Colors.primary, fontWeight: '700' },
-  activeBg: {
-    position: 'absolute',
-    backgroundColor: Colors.primaryLight,
-    borderRadius: 16,
-    top: -6,
-    bottom: -6,
-    left: -12,
-    right: -12,
-    zIndex: 0,
+  navIconWrapperActive: {
+    backgroundColor: '#F7F7F7',
   },
 });

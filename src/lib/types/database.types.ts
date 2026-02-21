@@ -213,6 +213,27 @@ export interface Database {
                 Relationships: [];
             };
 
+            departments: {
+                Row: {
+                    id: string;
+                    name: string;
+                    code: string;
+                    description: string | null;
+                    created_at: string;
+                };
+                Insert: {
+                    name: string;
+                    code: string;
+                    description?: string | null;
+                };
+                Update: {
+                    name?: string;
+                    code?: string;
+                    description?: string | null;
+                };
+                Relationships: [];
+            };
+
             teacher_reviews: {
                 Row: {
                     id: string; teacher_id: string; user_id: string;

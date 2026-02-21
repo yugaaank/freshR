@@ -25,25 +25,25 @@ export const Colors = {
     tealLight: '#E0FAF7',
 
     // ── Backgrounds (Apple iOS System Grays)
-    background: '#FAFAFA',
-    surface: '#F2F2F7',
-    sectionBg: '#F2F2F7',
+    background: '#FFFFFF',
+    surface: '#F4F8F5',
+    sectionBg: '#F4F8F5',
     cardBg: '#FFFFFF',
     darkBg: '#1C1C1E',
     darkBgSecondary: '#2C2C2E',
-    heroBg: '#1A1A2E',
-    heroBgEnd: '#16213E',
+    heroBg: '#E8F5EC',
+    heroBgEnd: '#D7F0E4',
 
     // ── Text
-    text: '#1C1C1E',
-    textSecondary: '#6B6B6B',
-    textTertiary: '#AEAEB2',
+    text: '#0F1B15',
+    textSecondary: '#4F5E55',
+    textTertiary: '#7A877B',
     textLight: '#FFFFFF',
-    textDimmed: 'rgba(255,255,255,0.70)',
+    textDimmed: 'rgba(15,27,21,0.65)',
 
     // ── Semantic
-    success: '#34C759',          // Apple green
-    successLight: '#E8FAF0',
+    success: '#4CCE8F',          // Lighter green
+    successLight: '#EAFFF4',
     error: '#FF3B30',            // Apple red
     errorLight: '#FFF0EF',
     warning: '#FF9500',          // Apple orange
@@ -68,8 +68,8 @@ export const Colors = {
     // ── Tag variants
     tagBlue: '#E5F1FF',
     tagBlueTxt: '#007AFF',
-    tagGreen: '#E8FAF0',
-    tagGreenTxt: '#34C759',
+    tagGreen: '#E6FBF0',
+    tagGreenTxt: '#2F8A5F',
     tagOrange: '#FFF3E8',
     tagOrangeTxt: '#FC8019',
     tagPurple: '#F0EFFF',

@@ -1,969 +1,658 @@
 import { Ionicons } from '@expo/vector-icons';
-import { BlurView } from 'expo-blur';
-import { LinearGradient } from 'expo-linear-gradient';
 import React, { useMemo, useState } from 'react';
 import {
     Dimensions,
     Image,
-    Pressable,
     ScrollView,
+    StatusBar,
     StyleSheet,
     Text,
     TextInput,
     TouchableOpacity,
-    View
+    View,
 } from 'react-native';
-import Animated, {
-    Extrapolation,
-    FadeInDown,
-    Layout,
-    interpolate,
-    useAnimatedScrollHandler,
-    useAnimatedStyle,
-    useSharedValue,
-    withSpring
-} from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { menuCategories, menuItems, restaurants } from '../../src/data/food';
 import { useCartStore } from '../../src/store/cartStore';
-import { Colors, Radius, Shadows, Spacing, Typography } from '../../src/theme';
+import { router } from 'expo-router';
+import { Colors, Radius, Spacing, Typography } from '../../src/theme';
 
-const { width: SW } = Dimensions.get('window');
-const ITEM_W = (SW - Spacing.section * 2 - 12) / 2;
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const CHIP_SIZE = (SCREEN_WIDTH - Spacing.section * 2 - Spacing.md * 2) / 3;
+const categories = ['All', ...menuCategories.map((cat) => cat.name)];
 
-const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
-
-function SpringCard({ children, style, onPress, delay = 0, ...props }: any) {
-    const scale = useSharedValue(1);
-    const animatedStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
-
-    return (
-        <AnimatedPressable
-            onPressIn={() => { scale.value = withSpring(0.96, { damping: 15, stiffness: 200 }); }}
-            onPressOut={() => { scale.value = withSpring(1, { damping: 15, stiffness: 200 }); }}
-            onPress={onPress}
-            style={[style, animatedStyle]}
-            entering={FadeInDown.delay(delay).springify()}
-            {...props}
-        >
-            {children}
-        </AnimatedPressable>
-    );
-}
-
-function createQRCode(prefix: string) {
-    return `${prefix}-${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
-}
+const canteenIcons: { [key: string]: React.ComponentProps<typeof Ionicons>['name'] } = {
+    'Canteen Central': 'cafe',
+    'Burger Shed': 'fast-food',
+    'Fresh Greens': 'leaf',
+    'Main Canteen': 'restaurant',
+    'South Court': 'restaurant',
+    'North Court': 'leaf',
+    'Express': 'rocket',
+    'Green Kitchen': 'water',
+};
 
 export default function FoodScreen() {
     const [activeRestaurantId, setActiveRestaurantId] = useState(restaurants[0].id);
+    const [search, setSearch] = useState('');
     const [activeCategory, setActiveCategory] = useState('All');
     const [vegOnly, setVegOnly] = useState(false);
     const [nonVegOnly, setNonVegOnly] = useState(false);
-    const [search, setSearch] = useState('');
     const cart = useCartStore();
-    const [cartOpen, setCartOpen] = useState(false);
-    const [checkoutStep, setCheckoutStep] = useState<'review' | 'payment'>('review');
-    const [orderStatus, setOrderStatus] = useState<string | null>(null);
-    const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
-    const [lastSlot, setLastSlot] = useState<string | null>(null);
-    const [slotOpen, setSlotOpen] = useState(false);
-    const [qrPending, setQrPending] = useState(false);
-    const [qrScanned, setQrScanned] = useState(false);
-    const [qrCode, setQrCode] = useState<string>('');
-    const slots = useMemo(() => {
-        const generated: string[] = [];
-        for (let hour = 8; hour < 18; hour++) {
-            for (let minute = 0; minute < 60; minute += 10) {
-                const label = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
-                generated.push(label);
-            }
-        }
-        return generated;
-    }, []);
 
-    const restaurant = restaurants.find((r) => r.id === activeRestaurantId) ?? restaurants[0];
+    const restaurant =
+        restaurants.find((r) => r.id === activeRestaurantId) ?? restaurants[0];
 
-    const filtered = menuItems.filter((item) => {
-        if (item.restaurantId !== activeRestaurantId) return false;
-        if (activeCategory !== 'All' && item.category !== activeCategory) return false;
-        if (vegOnly && !item.isVeg) return false;
-        if (nonVegOnly && item.isVeg) return false;
-        if (search && !item.name.toLowerCase().includes(search.toLowerCase())) return false;
-        return true;
-    });
+    const filteredItems = useMemo(() => {
+        return menuItems
+            .filter((item) => {
+                if (item.restaurantId !== activeRestaurantId) return false;
+                if (activeCategory !== 'All' && item.category !== activeCategory) return false;
+                if (vegOnly && !item.isVeg) return false;
+                if (nonVegOnly && item.isVeg) return false;
+                if (
+                    search &&
+                    !item.name.toLowerCase().includes(search.toLowerCase()) &&
+                    !item.description.toLowerCase().includes(search.toLowerCase())
+                ) {
+                    return false;
+                }
+                return true;
+            })
+            .sort((a, b) => Number(b.isPopular) - Number(a.isPopular));
+    }, [activeRestaurantId, activeCategory, vegOnly, nonVegOnly, search]);
+
+    const trendingRecipe = useMemo(
+        () =>
+            menuItems.find(
+                (item) => item.isPopular && item.restaurantId === activeRestaurantId
+            ) ??
+            menuItems.find((item) => item.isPopular) ??
+            menuItems[0],
+        [activeRestaurantId]
+    );
 
     const cartCount = cart.totalItems();
     const cartTotal = cart.totalPrice();
 
-    const scrollY = useSharedValue(0);
-    const scrollHandler = useAnimatedScrollHandler({
-        onScroll: (event) => {
-            scrollY.value = event.contentOffset.y;
-        },
-    });
-
-    const stickyHeaderStyle = useAnimatedStyle(() => {
-        const translateY = interpolate(
-            scrollY.value,
-            [0, 200, 250],
-            [-100, -100, 0],
-            Extrapolation.CLAMP
-        );
-        const opacity = interpolate(
-            scrollY.value,
-            [0, 200, 250],
-            [0, 0, 1],
-            Extrapolation.CLAMP
-        );
-        return {
-            transform: [{ translateY }],
-            opacity,
-        };
-    });
+    const trendingImageUri =
+        trendingRecipe?.image ?? 'https://images.unsplash.com/photo-1504754524776-8f4f37790ca0?w=800&q=80';
 
     return (
         <SafeAreaView style={styles.safe} edges={['top']}>
-            {/* ═══ STICKY FILTER HEADER ═══ */}
-            <Animated.View style={[styles.stickyHeader, stickyHeaderStyle]}>
-                <ScrollView
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={styles.filterBar}
-                >
+            <StatusBar barStyle="dark-content" />
+            <ScrollView
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={styles.scrollContent}
+            >
+                <View style={styles.headerRow}>
+                    <View>
+                        <Text style={styles.pretitle}>Good afternoon</Text>
+                        <Text style={styles.title}>What’s cooking today?</Text>
+                    </View>
                     <TouchableOpacity
-                        style={[styles.vegToggle, vegOnly && styles.vegToggleActive]}
-                        onPress={() => { setVegOnly(!vegOnly); setNonVegOnly(false); }}
+                        style={styles.cartIconWrap}
+                        onPress={() => router.push('/cart')}
                         activeOpacity={0.85}
                     >
-                        <View style={styles.vegBadgeIcon}>
-                            <View style={styles.vegDot} />
-                        </View>
-                        <Text style={styles.vegToggleText}>Veg</Text>
+                        <Ionicons name="cart-outline" size={22} color={Colors.text} />
+                        {cartCount > 0 && (
+                            <View style={styles.badgeCircle}>
+                                <Text style={styles.badgeText}>{cartCount}</Text>
+                            </View>
+                        )}
                     </TouchableOpacity>
-                    <TouchableOpacity
-                        style={[styles.nonVegToggle, nonVegOnly && styles.nonVegToggleActive]}
-                        onPress={() => { setNonVegOnly(!nonVegOnly); setVegOnly(false); }}
-                        activeOpacity={0.85}
-                    >
-                        <View style={styles.nonVegBadgeIcon}>
-                            <View style={styles.nonVegDot} />
-                        </View>
-                        <Text style={styles.vegToggleText}>Non-veg</Text>
-                    </TouchableOpacity>
-                    {['All', ...menuCategories.map((c) => c.name)].map((cat) => (
-                        <TouchableOpacity
-                            key={`sticky-${cat}`}
-                            style={[styles.catChip, activeCategory === cat && styles.catChipActive]}
-                            onPress={() => setActiveCategory(cat)}
-                            activeOpacity={0.85}
-                        >
-                            <Text style={[styles.catText, activeCategory === cat && styles.catTextActive]}>{cat}</Text>
-                        </TouchableOpacity>
-                    ))}
-                </ScrollView>
-            </Animated.View>
-
-            {/* ═══ RESTAURANT TABS (Blinkit-style top switcher) ═══ */}
-            <View style={styles.tabBar}>
-                <View style={styles.restTabsWrap}>
-                    <ScrollView
-                        horizontal
-                        showsHorizontalScrollIndicator={false}
-                        contentContainerStyle={styles.restTabs}
-                    >
-                        {restaurants.map((r) => (
-                            <TouchableOpacity
-                                key={r.id}
-                                style={[styles.restTab, activeRestaurantId === r.id && styles.restTabActive]}
-                                onPress={() => { setActiveRestaurantId(r.id); setActiveCategory('All'); }}
-                                activeOpacity={0.85}
-                            >
-                                <Text style={[styles.restTabText, activeRestaurantId === r.id && styles.restTabTextActive]} numberOfLines={1}>
-                                    {r.name}
-                                </Text>
-                            </TouchableOpacity>
-                        ))}
-                    </ScrollView>
                 </View>
-            </View>
-
-            {/* ═══ RESTAURANT INFO CARD (Blinkit floating card) ═══ */}
-            <SpringCard delay={100} style={styles.infoCard}>
-                <View style={styles.infoCardTop}>
-                    <View style={styles.infoLeft}>
-                        <Text style={styles.infoName}>{restaurant.name}</Text>
-                        <Text style={styles.infoMeta}>{restaurant.deliveryTime} · {restaurant.cuisine.split('·')[0].trim()}</Text>
-                    </View>
-                    <View style={styles.ratingBadge}>
-                        <Ionicons name="star" size={11} color="#FFF" />
-                        <Text style={styles.ratingText}>{restaurant.rating}</Text>
-                    </View>
-                </View>
-                <View style={styles.offerStrip}>
-                    <View style={styles.offerBadge}>
-                        <Ionicons name="pricetag" size={11} color="#FFF" />
-                        <Text style={styles.offerBadgeText}>FREE DELIVERY</Text>
-                    </View>
-                    <Text style={styles.offerDesc}>No delivery charge on all orders</Text>
-                </View>
-            </SpringCard>
-
-            {/* ═══ SEARCH + FILTERS ═══ */}
-            <View style={styles.searchRow}>
-                <View style={styles.searchBar}>
-                    <Ionicons name="search" size={16} color={Colors.textTertiary} />
+                <View style={styles.searchRow}>
+                    <Ionicons name="search" size={18} color={Colors.textSecondary} />
                     <TextInput
                         style={styles.searchInput}
-                        placeholder="Search for dishes"
-                        placeholderTextColor={Colors.textTertiary}
+                        placeholder="Search here"
+                        placeholderTextColor={Colors.textSecondary}
                         value={search}
                         onChangeText={setSearch}
                     />
-                    <Ionicons name="mic" size={16} color={Colors.primary} />
+                    <Ionicons name="mic" size={18} color={Colors.textSecondary} />
                 </View>
-            </View>
 
-            {/* ── Veg / Non-veg toggles + category chips ── */}
-            <View style={styles.filterBarWrap}>
+                <Text style={styles.sectionLabel}>Choose a canteen</Text>
+                <View style={styles.canteenGrid}>
+                    {restaurants.map((canteen) => {
+                        const iconName = canteenIcons[canteen.name] ?? 'restaurant';
+                        const isActive = canteen.id === activeRestaurantId;
+                        return (
+                            <TouchableOpacity
+                                key={canteen.id}
+                                style={[
+                                    styles.canteenChip,
+                                    isActive && styles.canteenChipActive,
+                                ]}
+                                activeOpacity={0.85}
+                                onPress={() => {
+                                    setActiveRestaurantId(canteen.id);
+                                    setSearch('');
+                                    setNonVegOnly(false);
+                                    setVegOnly(false);
+                                }}
+                            >
+                                <View style={styles.canteenIconWrap}>
+                                    <Ionicons name={iconName} size={22} color={Colors.success} />
+                                </View>
+                                <Text style={styles.canteenLabel} numberOfLines={2}>
+                                    {canteen.name}
+                                </Text>
+                            </TouchableOpacity>
+                        );
+                    })}
+                </View>
+
+                <Text style={styles.sectionLabel}>Trending Recipe</Text>
+                <View style={styles.trendingCard}>
+                    <Image source={{ uri: trendingImageUri }} style={styles.trendingImage} />
+                    <View style={styles.trendingInfo}>
+                        <Text style={styles.trendingTag}>Chef’s pick</Text>
+                        <Text style={styles.trendingTitle} numberOfLines={2}>
+                            {trendingRecipe?.name}
+                        </Text>
+                        <Text style={styles.trendingMeta}>
+                            {trendingRecipe?.description}
+                        </Text>
+                        <View style={styles.trendingActions}>
+                            <TouchableOpacity
+                                style={styles.bookBtn}
+                                onPress={() => {
+                                    if (trendingRecipe) {
+                                        cart.addItem(
+                                            trendingRecipe,
+                                            trendingRecipe.restaurantId,
+                                            restaurant.name
+                                        );
+                                    }
+                                }}
+                                activeOpacity={0.85}
+                            >
+                                <Text style={styles.bookBtnText}>Book it</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity>
+                                <Ionicons
+                                    name="heart-outline"
+                                    size={22}
+                                    color={Colors.success}
+                                />
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </View>
+
+                <View style={styles.filterRow}>
+                    <TouchableOpacity
+                        style={[styles.filterToggle, vegOnly && styles.filterToggleActive]}
+                        onPress={() => {
+                            setVegOnly(!vegOnly);
+                            if (!vegOnly) setNonVegOnly(false);
+                        }}
+                        activeOpacity={0.85}
+                    >
+                        <Text style={[styles.toggleText, vegOnly && styles.toggleTextActive]}>Veg only</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        style={[styles.filterToggle, nonVegOnly && styles.filterToggleActive]}
+                        onPress={() => {
+                            setNonVegOnly(!nonVegOnly);
+                            if (!nonVegOnly) setVegOnly(false);
+                        }}
+                        activeOpacity={0.85}
+                    >
+                        <Text style={[styles.toggleText, nonVegOnly && styles.toggleTextActive]}>
+                            Non-veg
+                        </Text>
+                    </TouchableOpacity>
+                </View>
+
                 <ScrollView
                     horizontal
                     showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={styles.filterBar}
+                    contentContainerStyle={styles.categoryRow}
                 >
-                    <TouchableOpacity
-                        style={[styles.vegToggle, vegOnly && styles.vegToggleActive]}
-                        onPress={() => { setVegOnly(!vegOnly); setNonVegOnly(false); }}
-                        activeOpacity={0.85}
-                    >
-                        <View style={styles.vegBadgeIcon}>
-                            <View style={styles.vegDot} />
-                        </View>
-                        <Text style={styles.vegToggleText}>Veg</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                        style={[styles.nonVegToggle, nonVegOnly && styles.nonVegToggleActive]}
-                        onPress={() => { setNonVegOnly(!nonVegOnly); setVegOnly(false); }}
-                        activeOpacity={0.85}
-                    >
-                        <View style={styles.nonVegBadgeIcon}>
-                            <View style={styles.nonVegDot} />
-                        </View>
-                        <Text style={styles.vegToggleText}>Non-veg</Text>
-                    </TouchableOpacity>
-                    {['All', ...menuCategories.map((c) => c.name)].map((cat) => (
-                        <TouchableOpacity
-                            key={cat}
-                            style={[styles.catChip, activeCategory === cat && styles.catChipActive]}
-                            onPress={() => setActiveCategory(cat)}
-                            activeOpacity={0.85}
-                        >
-                            <Text style={[styles.catText, activeCategory === cat && styles.catTextActive]}>{cat}</Text>
-                        </TouchableOpacity>
-                    ))}
+                    {categories.map((category) => {
+                        const isActive = activeCategory === category;
+                        return (
+                            <TouchableOpacity
+                                key={category}
+                                style={[styles.categoryChip, isActive && styles.categoryChipActive]}
+                                onPress={() => setActiveCategory(category)}
+                                activeOpacity={0.85}
+                            >
+                                <Text
+                                    style={[
+                                        styles.categoryText,
+                                        isActive && styles.categoryTextActive,
+                                    ]}
+                                >
+                                    {category}
+                                </Text>
+                            </TouchableOpacity>
+                        );
+                    })}
                 </ScrollView>
-            </View>
 
-            {/* ═══ SECTION HEADER ═══ */}
-            <View style={styles.sectionHeader}>
-                <Text style={styles.sectionTitle}>Recommended ({filtered.length})</Text>
-                <Ionicons name="chevron-down" size={16} color={Colors.textSecondary} />
-            </View>
-
-            {/* ═══ 2-COLUMN MENU GRID (Blinkit style) ═══ */}
-            <Animated.FlatList
-                data={filtered}
-                onScroll={scrollHandler}
-                scrollEventThrottle={16}
-                keyExtractor={(item: any) => item.id}
-                numColumns={2}
-                showsVerticalScrollIndicator={false}
-                columnWrapperStyle={styles.row}
-                contentContainerStyle={styles.grid}
-                renderItem={({ item, index }: any) => {
-                    const qty = cart.items.find((c) => c.item.id === item.id)?.quantity ?? 0;
-                    return (
-                        <SpringCard delay={150 + index * 50} style={styles.menuCardWrap}>
-                            <View style={styles.menuCard}>
-                                {/* Food image container */}
-                                <View style={styles.imageWrap}>
-                                    {item.image ? (
-                                        <Image
-                                            source={{ uri: item.image }}
-                                            style={styles.foodImage}
-                                            resizeMode="cover"
-                                        />
-                                    ) : (
-                                        <LinearGradient
-                                            colors={[Colors.surface, Colors.border]}
-                                            style={styles.imagePlaceholder}
-                                        >
-                                            <Ionicons name="fast-food-outline" size={32} color={Colors.textTertiary} />
-                                        </LinearGradient>
-                                    )}
-                                    {/* Veg / NonVeg indicator over image */}
-                                    <View style={[styles.vegIndicator, { borderColor: item.isVeg ? '#22C55E' : '#EF4444' }]}>
-                                        <View style={[styles.vegIndicatorDot, { backgroundColor: item.isVeg ? '#22C55E' : '#EF4444' }]} />
-                                    </View>
-                                    {/* Rating badge overlapping top right */}
-                                    <View style={styles.ratingChip}>
-                                        <Ionicons name="star" size={10} color="#FFD60A" />
-                                        <Text style={styles.ratingChipText}>{item.rating}</Text>
-                                    </View>
-                                    {item.isPopular && (
-                                        <LinearGradient
-                                            colors={['#FF8A00', '#E52E71']}
-                                            start={{ x: 0, y: 0 }}
-                                            end={{ x: 1, y: 1 }}
-                                            style={styles.popularChipGradient}
-                                        >
-                                            <Text style={styles.popularChipTextGradient}>🔥 Bestseller</Text>
-                                        </LinearGradient>
-                                    )}
-                                </View>
-
-                                {/* Item textual info */}
-                                <View style={styles.itemInfo}>
-                                    <Text style={styles.itemName} numberOfLines={2}>{item.name}</Text>
-                                    <Text style={styles.itemDesc} numberOfLines={2}>{item.description}</Text>
-
-                                    <View style={styles.itemActionsRow}>
-                                        <View>
-                                            <Text style={styles.itemPrice}>₹{item.price}</Text>
-                                            {item.isPopular && <Text style={styles.strikePrice}>₹{Math.floor(item.price * 1.2)}</Text>}
+                <View style={styles.menuSection}>
+                    {filteredItems.length === 0 && (
+                        <Text style={styles.emptyText}>No dishes match your filters.</Text>
+                    )}
+                    {filteredItems.map((item) => {
+                        const qty = cart.getQuantity(item.id);
+                        return (
+                            <View key={item.id} style={styles.menuCard}>
+                                <Image source={{ uri: item.image }} style={styles.menuImage} />
+                                <View style={styles.menuContent}>
+                                    <Text style={styles.menuTitle}>{item.name}</Text>
+                                    <Text style={styles.menuDesc} numberOfLines={2}>
+                                        {item.description}
+                                    </Text>
+                                    <View style={styles.menuMetaRow}>
+                                        <Text style={styles.menuPrice}>₹{item.price}</Text>
+                                        <View style={styles.menuRating}>
+                                            <Ionicons name="star" size={14} color="#FFD60A" />
+                                            <Text style={styles.menuRatingText}>{item.rating}</Text>
                                         </View>
-
+                                    </View>
+                                    <View style={styles.menuActions}>
                                         {qty === 0 ? (
                                             <TouchableOpacity
-                                                style={styles.addBtnContainer}
-                                                onPress={() => cart.addItem(item, item.restaurantId)}
-                                                activeOpacity={0.8}
+                                                style={styles.menuAddBtn}
+                                                onPress={() =>
+                                                    cart.addItem(item, item.restaurantId, restaurant.name)
+                                                }
+                                                activeOpacity={0.85}
                                             >
-                                                <Text style={styles.addBtnTextBeautiful}>ADD <Ionicons name="add" size={14} /></Text>
+                                                <Text style={styles.menuAddText}>Add</Text>
                                             </TouchableOpacity>
                                         ) : (
-                                            <View style={styles.qtyCtrlBeautiful}>
-                                                <TouchableOpacity onPress={() => cart.decrementItem(item.id)} style={styles.qtyBtnBeautiful}>
-                                                    <Ionicons name="remove" size={16} color="#FFF" />
+                                            <View style={styles.qtyRow}>
+                                                <TouchableOpacity
+                                                    onPress={() => cart.decrementItem(item.id)}
+                                                    style={styles.qtyBtn}
+                                                    activeOpacity={0.85}
+                                                >
+                                                    <Ionicons
+                                                        name="remove-circle-outline"
+                                                        size={24}
+                                                        color={Colors.textSecondary}
+                                                    />
                                                 </TouchableOpacity>
-                                                <Text style={styles.qtyTextBeautiful}>{qty}</Text>
-                                                <TouchableOpacity onPress={() => cart.addItem(item, item.restaurantId)} style={styles.qtyBtnBeautiful}>
-                                                    <Ionicons name="add" size={16} color="#FFF" />
+                                                <Text style={styles.qtyValue}>{qty}</Text>
+                                                <TouchableOpacity
+                                                    onPress={() =>
+                                                        cart.addItem(item, item.restaurantId, restaurant.name)
+                                                    }
+                                                    style={styles.qtyBtn}
+                                                    activeOpacity={0.85}
+                                                >
+                                                    <Ionicons
+                                                        name="add-circle"
+                                                        size={24}
+                                                        color={Colors.success}
+                                                    />
                                                 </TouchableOpacity>
                                             </View>
                                         )}
                                     </View>
                                 </View>
                             </View>
-                        </SpringCard>
-                    );
-                }}
-            />
+                        );
+                    })}
+                </View>
 
-            {/* ═══ CART BAR ═══ */}
-            {cartCount > 0 && (
-                <View style={styles.cartBarWrap}>
-                    <TouchableOpacity activeOpacity={0.92} onPress={() => { setCartOpen(true); setCheckoutStep('review'); }}>
-                        <BlurView intensity={80} tint="dark" style={styles.cartBar}>
-                            <View style={styles.cartLeft}>
-                                <View style={styles.cartBadge}>
-                                    <Text style={styles.cartBadgeText}>{cartCount}</Text>
-                                </View>
-                                <Text style={styles.cartLabel}>View Cart</Text>
-                            </View>
-                            <Text style={styles.cartPrice}>₹{cartTotal}</Text>
-                        </BlurView>
+                {cartCount > 0 && (
+                    <TouchableOpacity
+                        style={styles.cartSummary}
+                        activeOpacity={0.9}
+                        onPress={() => router.push('/cart')}
+                    >
+                        <View>
+                            <Text style={styles.cartSummaryLabel}>View cart</Text>
+                            <Text style={styles.cartSummaryPrice}>
+                                {cartCount} items · ₹{cartTotal}
+                            </Text>
+                        </View>
+                        <Ionicons name="chevron-forward" size={20} color={Colors.text} />
                     </TouchableOpacity>
-                </View>
-            )}
-
-            {cartOpen && (
-                <View style={styles.cartOverlayContainer}>
-                    <TouchableOpacity style={styles.cartOverlayBackdrop} onPress={() => { setCartOpen(false); setOrderStatus(null); }} />
-                    <View style={styles.cartOverlay}>
-                        <View style={styles.cartHeader}>
-                            <Text style={styles.cartHeaderTitle}>Your Order</Text>
-                            <TouchableOpacity onPress={() => { setCartOpen(false); setOrderStatus(null); }}>
-                                <Ionicons name="close-circle" size={24} color={Colors.textSecondary} />
-                            </TouchableOpacity>
-                        </View>
-                            <ScrollView style={styles.cartItemsList}>
-                            {cart.items.map((entry) => (
-                                <View key={entry.item.id} style={styles.cartItem}>
-                                    <View>
-                                        <Text style={styles.cartItemName}>{entry.item.name}</Text>
-                                        <Text style={styles.cartItemMeta}>₹{entry.item.price} • {entry.quantity} pcs</Text>
-                                    </View>
-                                    <View style={styles.qtyCtrlBeautiful}>
-                                        <TouchableOpacity onPress={() => cart.decrementItem(entry.item.id)} style={styles.qtyBtnBeautiful}>
-                                            <Ionicons name="remove" size={16} color="#FFF" />
-                                        </TouchableOpacity>
-                                        <Text style={styles.qtyTextBeautiful}>{entry.quantity}</Text>
-                                        <TouchableOpacity onPress={() => cart.addItem(entry.item, entry.restaurantId)} style={styles.qtyBtnBeautiful}>
-                                            <Ionicons name="add" size={16} color="#FFF" />
-                                        </TouchableOpacity>
-                                    </View>
-                                </View>
-                            ))}
-                        </ScrollView>
-                        <View style={styles.cartSlotSection}>
-                            <Text style={styles.cartSlotLabel}>Pickup window (10 min)</Text>
-                            <TouchableOpacity
-                                style={[styles.dropdown, slotOpen && styles.dropdownActive]}
-                                onPress={() => setSlotOpen((prev) => !prev)}
-                                activeOpacity={0.8}
-                            >
-                                <Text style={[styles.dropdownLabel, selectedSlot ? styles.dropdownLabelActive : styles.dropdownPlaceholder]}>
-                                    {selectedSlot ?? 'Select a time slot'}
-                                </Text>
-                                <Ionicons name={slotOpen ? 'chevron-up' : 'chevron-down'} size={16} color={Colors.textSecondary} />
-                            </TouchableOpacity>
-                            {slotOpen && (
-                                <View style={styles.dropdownList}>
-                                    <ScrollView nestedScrollEnabled style={{ maxHeight: 160 }}>
-                                        {slots.map((slot) => (
-                                            <TouchableOpacity
-                                                key={slot}
-                                                style={styles.dropdownItem}
-                                                onPress={() => {
-                                                    setSelectedSlot(slot);
-                                                    setSlotOpen(false);
-                                                }}
-                                            >
-                                                <Text style={styles.dropdownItemText}>{slot}</Text>
-                                            </TouchableOpacity>
-                                        ))}
-                                    </ScrollView>
-                                </View>
-                            )}
-                        </View>
-                        <View style={styles.cartFooter}>
-                            <Text style={styles.cartFooterTotal}>Total ₹{cartTotal}</Text>
-                            {checkoutStep === 'review' ? (
-                                <TouchableOpacity
-                                    style={[styles.cartPrimaryBtn, !selectedSlot && styles.cartPrimaryBtnDisabled]}
-                                    onPress={() => {
-                                        if (!selectedSlot) {
-                                            setOrderStatus('Pick a pickup window before placing the order.');
-                                            return;
-                                        }
-                                        setCheckoutStep('payment');
-                                        setOrderStatus('Order placed — ready for payment.');
-                                    }}
-                                    disabled={!selectedSlot}
-                                >
-                                    <Text style={styles.cartPrimaryText}>Place order</Text>
-                                </TouchableOpacity>
-                            ) : (
-                                <TouchableOpacity
-                                    style={[styles.cartPrimaryBtn, styles.cartPrimaryBtnPay]}
-                                    onPress={() => {
-                                        setOrderStatus('Payment successful. Collect your meal at the counter.');
-                                        setQrPending(true);
-                                        setQrScanned(false);
-                                        setLastSlot(selectedSlot);
-                                        setQrCode(createQRCode('FOOD'));
-                                        cart.clearCart();
-                                        setSelectedSlot(null);
-                                        setTimeout(() => { setCartOpen(false); setOrderStatus(null); }, 800);
-                                        setCheckoutStep('review');
-                                    }}
-                                >
-                                    <Text style={styles.cartPrimaryText}>Pay now</Text>
-                                </TouchableOpacity>
-                            )}
-                        </View>
-                        {orderStatus && <Text style={styles.orderStatus}>{orderStatus}</Text>}
-                    </View>
-                </View>
-            )}
-            {qrPending && (
-                <Animated.View layout={Layout.springify()} style={[styles.qrCard, qrScanned && styles.qrCardCollected]}>
-                    <Text style={styles.qrLabel}>Order QR</Text>
-                    <Text style={styles.qrCode}>{qrCode}</Text>
-                    <Text style={styles.qrSlot}>Slot: {lastSlot ?? '—'}</Text>
-                    <Text style={styles.qrStatus}>
-                        {qrScanned ? 'Collected' : 'Pending collection — scan QR to confirm.'}
-                    </Text>
-                    {!qrScanned && (
-                        <TouchableOpacity
-                            style={styles.qrBtn}
-                            onPress={() => {
-                                setQrScanned(true);
-                                setOrderStatus('Order collected successfully.');
-                                setTimeout(() => {
-                                    setQrPending(false);
-                                    setLastSlot(null);
-                                }, 1200);
-                            }}
-                        >
-                            <Text style={styles.qrBtnText}>Scan</Text>
-                        </TouchableOpacity>
-                    )}
-                </Animated.View>
-            )}
+                )}
+            </ScrollView>
         </SafeAreaView>
     );
 }
 
-// ─── Styles ──────────────────────────────────────────────────────────────────
-
 const styles = StyleSheet.create({
-    safe: { flex: 1, backgroundColor: '#F5F5F5', position: 'relative' },
-    stickyHeader: {
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        zIndex: 50,
-        backgroundColor: '#FFF',
-        borderBottomWidth: 1,
-        borderBottomColor: Colors.border,
-        paddingTop: Spacing.xl + 20, // push below safe area
-        paddingBottom: Spacing.sm,
-        ...Shadows.sm,
+    safe: { flex: 1, backgroundColor: Colors.background },
+    scrollContent: {
+        padding: Spacing.section,
+        paddingBottom: Spacing.xxxl,
     },
-
-    // Restaurant tabs
-    tabBar: {
-        backgroundColor: '#FFF',
-        borderBottomWidth: 1,
-        borderBottomColor: Colors.border,
-    },
-    restTabsWrap: { height: 50 },
-    restTabs: {
-        paddingHorizontal: Spacing.section,
-        alignItems: 'center',
+    headerRow: {
         flexDirection: 'row',
-        gap: 8,
-        height: 50,
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: Spacing.lg,
     },
-    restTab: {
-        paddingHorizontal: 16,
-        paddingVertical: 6,
-        borderRadius: Radius.pill,
+    pretitle: {
+        ...Typography.body2,
+        color: Colors.textSecondary,
+    },
+    title: {
+        ...Typography.h2,
+        color: Colors.text,
+        marginTop: Spacing.xs,
+    },
+    cartIconWrap: {
+        width: 52,
+        height: 52,
+        borderRadius: 16,
         backgroundColor: Colors.surface,
-    },
-    restTabActive: { backgroundColor: Colors.primary },
-    restTabText: { ...Typography.label, fontSize: 13, color: Colors.textSecondary, fontWeight: '600' as const },
-    restTabTextActive: { color: '#FFF' },
-
-    // Restaurant info card
-    infoCard: {
-        marginHorizontal: Spacing.section,
-        marginVertical: Spacing.md,
-        backgroundColor: '#FFF',
-        borderRadius: Radius.xl,
-        padding: Spacing.md,
-        ...Shadows.md,
-    },
-    infoCardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
-    infoLeft: { flex: 1, marginRight: Spacing.md },
-    infoName: { ...Typography.h4, color: Colors.text },
-    infoMeta: { ...Typography.caption, color: Colors.textSecondary, marginTop: 2 },
-    ratingBadge: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 3,
-        backgroundColor: '#1A9E5F',
-        borderRadius: 6,
-        paddingHorizontal: 8,
-        paddingVertical: 4,
-    },
-    ratingText: { ...Typography.label, color: '#FFF', fontSize: 12, fontWeight: '700' as const },
-    offerStrip: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 8,
-        marginTop: Spacing.sm,
-        paddingTop: Spacing.sm,
-        borderTopWidth: 1,
-        borderTopColor: Colors.divider,
-    },
-    offerBadge: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 4,
-        backgroundColor: '#6C63FF',
-        borderRadius: 4,
-        paddingHorizontal: 6,
-        paddingVertical: 3,
-    },
-    offerBadgeText: { ...Typography.micro, color: '#FFF', fontWeight: '700' as const, fontSize: 9 },
-    offerDesc: { ...Typography.caption, color: Colors.textSecondary },
-
-    // Search
-    searchRow: { paddingHorizontal: Spacing.section, paddingBottom: Spacing.sm, backgroundColor: '#FFF' },
-    searchBar: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: '#F2F2F7',
-        borderRadius: Radius.lg,
-        paddingHorizontal: Spacing.md,
-        paddingVertical: 10,
-        gap: 8,
-    },
-    searchInput: { flex: 1, ...Typography.body2, color: Colors.text, padding: 0 },
-
-    // Filters
-    filterBarWrap: { height: 48, backgroundColor: '#FFF', borderBottomWidth: 1, borderBottomColor: Colors.border },
-    filterBar: {
-        paddingHorizontal: Spacing.section,
-        gap: 8,
-        alignItems: 'center',
-        flexDirection: 'row',
-        height: 48,
-    },
-    vegToggle: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 5,
-        paddingHorizontal: 12,
-        paddingVertical: 5,
-        borderRadius: Radius.pill,
-        borderWidth: 1.5,
-        borderColor: '#22C55E',
-    },
-    vegToggleActive: { backgroundColor: '#DCFCE7' },
-    nonVegToggle: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 5,
-        paddingHorizontal: 12,
-        paddingVertical: 5,
-        borderRadius: Radius.pill,
-        borderWidth: 1.5,
-        borderColor: '#EF4444',
-    },
-    nonVegToggleActive: { backgroundColor: '#FEE2E2' },
-    vegBadgeIcon: {
-        width: 14, height: 14, borderWidth: 1.5, borderColor: '#22C55E', alignItems: 'center', justifyContent: 'center', borderRadius: 3
-    },
-    nonVegBadgeIcon: {
-        width: 14, height: 14, borderWidth: 1.5, borderColor: '#EF4444', alignItems: 'center', justifyContent: 'center', borderRadius: 3
-    },
-    vegDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#22C55E' },
-    nonVegDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#EF4444' },
-    vegToggleText: { ...Typography.micro, color: Colors.textSecondary, fontWeight: '600' as const },
-    catChip: {
-        paddingHorizontal: 12,
-        paddingVertical: 5,
-        borderRadius: Radius.pill,
-        backgroundColor: Colors.surface,
-    },
-    catChipActive: { backgroundColor: Colors.primaryLight, borderWidth: 1, borderColor: Colors.primary },
-    catText: { ...Typography.micro, color: Colors.textSecondary, fontWeight: '600' as const },
-    catTextActive: { color: Colors.primary },
-
-    // Section
-    sectionHeader: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 6,
-        paddingHorizontal: Spacing.section,
-        paddingVertical: Spacing.sm,
-        backgroundColor: '#FFF',
-    },
-    sectionTitle: { ...Typography.h4, color: Colors.text },
-
-    // 2-column grid
-    grid: { paddingHorizontal: Spacing.section, paddingTop: Spacing.sm, paddingBottom: 100 },
-    row: { gap: 16, marginBottom: 16 },
-    menuCardWrap: {
-        width: ITEM_W,
-        borderRadius: 20,
-        backgroundColor: '#FFF',
-        ...Shadows.md,
-        shadowColor: 'rgba(0,0,0,0.1)', // Softer shadow
-        shadowRadius: 10,
-        elevation: 6,
-    },
-    menuCard: {
-        flex: 1,
-        borderRadius: 20,
-        overflow: 'hidden',
-    },
-
-    // Food image
-    imageWrap: { width: '100%', height: ITEM_W * 0.85, position: 'relative' },
-    foodImage: { width: '100%', height: '100%', backgroundColor: Colors.surface },
-    imagePlaceholder: { width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' },
-    vegIndicator: {
-        position: 'absolute',
-        top: 8,
-        left: 8,
-        width: 16,
-        height: 16,
-        borderRadius: 4,
-        borderWidth: 1.5,
-        backgroundColor: 'rgba(255,255,255,0.9)',
+        borderWidth: 1,
+        borderColor: Colors.divider,
         alignItems: 'center',
         justifyContent: 'center',
+        position: 'relative',
     },
-    vegIndicatorDot: { width: 8, height: 8, borderRadius: 4 },
-    ratingChip: {
+    badgeCircle: {
+        width: 28,
+        height: 28,
+        borderRadius: 16,
+        backgroundColor: Colors.success,
+        alignItems: 'center',
+        justifyContent: 'center',
         position: 'absolute',
-        top: 8,
-        right: 8,
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 4,
-        backgroundColor: 'rgba(255,255,255,0.95)',
-        borderRadius: Radius.pill,
-        paddingHorizontal: 8,
-        paddingVertical: 4,
-        ...Shadows.sm,
+        top: -4,
+        right: -4,
     },
-    ratingChipText: { fontSize: 11, color: '#333', fontWeight: 'bold' as const },
-    popularChipGradient: {
-        position: 'absolute',
-        bottom: 8,
-        left: 8,
-        borderRadius: Radius.pill,
-        paddingHorizontal: 8,
-        paddingVertical: 4,
-        ...Shadows.sm,
-    },
-    popularChipTextGradient: { fontSize: 10, color: '#FFF', fontWeight: 'bold' as const },
-
-    // Item info
-    itemInfo: { padding: Spacing.md, gap: 4, flex: 1, justifyContent: 'space-between' },
-    itemName: { ...Typography.h5, color: Colors.text, fontSize: 14, lineHeight: 18 },
-    itemDesc: { ...Typography.caption, color: Colors.textTertiary, fontSize: 11, lineHeight: 15 },
-    itemActionsRow: {
-        flexDirection: 'row',
-        alignItems: 'flex-end',
-        justifyContent: 'space-between',
-        marginTop: 8,
-    },
-    itemPrice: { ...Typography.h5, color: Colors.text, fontSize: 15 },
-    strikePrice: { ...Typography.micro, color: Colors.textTertiary, textDecorationLine: 'line-through', marginTop: 2 },
-
-    // Beautiful ADD / QTY controls
-    addBtnContainer: {
-        backgroundColor: 'rgba(255,107,53,0.1)',
-        borderWidth: 1,
-        borderColor: 'rgba(255,107,53,0.3)',
-        borderRadius: Radius.lg,
-        paddingHorizontal: 16,
-        paddingVertical: 8,
-    },
-    addBtnTextBeautiful: {
-        ...Typography.label,
-        color: Colors.primary,
-        fontSize: 13,
-        fontWeight: 'bold' as const,
-    },
-    qtyCtrlBeautiful: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: Colors.primary,
-        borderRadius: Radius.lg,
-        paddingHorizontal: 4,
-        paddingVertical: 4,
-        ...Shadows.sm,
-    },
-    qtyBtnBeautiful: { padding: 4, paddingHorizontal: 6 },
-    qtyTextBeautiful: { ...Typography.label, color: '#FFF', fontSize: 13, minWidth: 20, textAlign: 'center', fontWeight: 'bold' as const },
-
-    // Cart bar
-    cartBarWrap: {
-        position: 'absolute',
-        bottom: 0,
-        left: 0,
-        right: 0,
-        padding: Spacing.section,
-        paddingBottom: Spacing.xl,
-    },
-    cartBar: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        borderRadius: Radius.lg,
-        padding: Spacing.lg,
-        overflow: 'hidden',
-        backgroundColor: 'rgba(0,0,0,0.65)', // Semi-transparent overlay to mix with dark tint
-    },
-    cartLeft: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
-    cartBadge: {
-        width: 24, height: 24, borderRadius: 12,
-        backgroundColor: 'rgba(255,255,255,0.25)',
-        alignItems: 'center', justifyContent: 'center',
-    },
-    cartBadgeText: { ...Typography.micro, color: '#FFF', fontWeight: '700' as const },
-    cartLabel: { ...Typography.h5, color: '#FFF' },
-    cartPrice: { ...Typography.h5, color: '#FFF' },
-    cartOverlayContainer: {
-        ...StyleSheet.absoluteFillObject,
-        zIndex: 100,
-    },
-    cartOverlayBackdrop: {
-        ...StyleSheet.absoluteFillObject,
-        backgroundColor: 'rgba(0,0,0,0.45)',
-    },
-    cartOverlay: {
-        position: 'absolute',
-        bottom: 0,
-        left: 0,
-        right: 0,
-        padding: Spacing.lg,
-        backgroundColor: '#F9FAFB',
-        borderTopLeftRadius: Radius.xxl,
-        borderTopRightRadius: Radius.xxl,
-        maxHeight: '70%',
-    },
-    cartHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: Spacing.md,
-    },
-    cartHeaderTitle: {
-        ...Typography.h4,
-    },
-    cartItemsList: {
-        maxHeight: 220,
-        marginBottom: Spacing.md,
-    },
-    cartItem: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        paddingVertical: Spacing.sm,
-        borderBottomWidth: 1,
-        borderColor: Colors.border,
-    },
-    cartItemName: {
-        ...Typography.body1,
-        fontWeight: '600',
-    },
-    cartItemMeta: {
+    badgeText: {
         ...Typography.caption,
-        color: Colors.textSecondary,
+        color: '#fff',
+        fontWeight: '700' as const,
     },
-    cartFooter: {
+    searchRow: {
         flexDirection: 'row',
-        justifyContent: 'space-between',
         alignItems: 'center',
-    },
-    cartFooterTotal: {
-        ...Typography.h5,
-        fontWeight: '700',
-    },
-    cartPrimaryBtn: {
-        backgroundColor: Colors.primary,
+        backgroundColor: Colors.surface,
+        borderRadius: Radius.xl,
+        paddingHorizontal: Spacing.md,
         paddingVertical: Spacing.sm,
-        paddingHorizontal: Spacing.lg,
-        borderRadius: Radius.lg,
+        borderWidth: 1,
+        borderColor: Colors.divider,
+        marginBottom: Spacing.lg,
     },
-    cartPrimaryBtnPay: {
-        backgroundColor: '#0F172A',
-    },
-    cartPrimaryText: {
-        ...Typography.label,
-        color: '#FFF',
-        fontWeight: '700',
-    },
-    orderStatus: {
-        marginTop: Spacing.sm,
+    searchInput: {
+        flex: 1,
         ...Typography.body2,
-        color: Colors.success,
-        textAlign: 'center',
+        marginHorizontal: Spacing.sm,
+        color: Colors.text,
     },
-    cartSlotSection: {
+    sectionLabel: {
+        ...Typography.h4,
+        color: Colors.text,
         marginBottom: Spacing.sm,
     },
-    cartSlotLabel: {
-        ...Typography.caption,
-        color: Colors.textSecondary,
-        marginBottom: Spacing.xs,
-    },
-    dropdown: {
-        borderWidth: 1,
-        borderColor: Colors.border,
-        borderRadius: Radius.md,
-        paddingVertical: Spacing.sm,
-        paddingHorizontal: Spacing.md,
+    canteenGrid: {
         flexDirection: 'row',
-        alignItems: 'center',
+        flexWrap: 'wrap',
         justifyContent: 'space-between',
+        marginBottom: Spacing.lg,
+    },
+    canteenChip: {
+        width: CHIP_SIZE,
+        height: CHIP_SIZE,
         backgroundColor: Colors.surface,
-    },
-    dropdownActive: {
-        borderColor: Colors.primary,
-    },
-    dropdownLabel: {
-        ...Typography.body2,
-    },
-    dropdownPlaceholder: {
-        color: Colors.textTertiary,
-    },
-    dropdownLabelActive: {
-        color: Colors.text,
-        fontWeight: '700',
-    },
-    dropdownList: {
-        marginTop: Spacing.sm,
-        borderWidth: 1,
-        borderColor: Colors.border,
-        borderRadius: Radius.md,
-        backgroundColor: Colors.cardBg,
-    },
-    dropdownItem: {
-        paddingVertical: Spacing.sm,
-        paddingHorizontal: Spacing.lg,
-    },
-    dropdownItemText: {
-        ...Typography.body2,
-        color: Colors.text,
-    },
-    cartPrimaryBtnDisabled: {
-        opacity: 0.5,
-    },
-    qrCard: {
-        position: 'absolute',
-        bottom: 90,
-        left: Spacing.section,
-        right: Spacing.section,
-        backgroundColor: '#FFF',
         borderRadius: Radius.xl,
-        padding: Spacing.lg,
-        ...Shadows.lg,
         alignItems: 'center',
-    },
-    qrCardCollected: {
+        justifyContent: 'center',
         borderWidth: 1,
+        borderColor: Colors.divider,
+        padding: Spacing.sm,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 8 },
+        shadowRadius: 12,
+        shadowOpacity: 0.05,
+        elevation: 2,
+        marginBottom: Spacing.md,
+    },
+    canteenChipActive: {
         borderColor: Colors.success,
+        backgroundColor: '#EAFFF4',
     },
-    qrLabel: {
+    canteenIconWrap: {
+        width: 42,
+        height: 42,
+        borderRadius: Radius.md,
+        backgroundColor: 'rgba(76,206,143,0.15)',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: Spacing.xs,
+    },
+    canteenLabel: {
         ...Typography.caption,
-        color: Colors.textSecondary,
-        marginBottom: Spacing.xs,
-    },
-    qrCode: {
-        ...Typography.h3,
-        marginBottom: Spacing.xs,
-    },
-    qrSlot: {
-        ...Typography.body2,
-        color: Colors.textSecondary,
-    },
-    qrStatus: {
-        ...Typography.body2,
-        marginTop: Spacing.sm,
         color: Colors.text,
         textAlign: 'center',
     },
-    qrBtn: {
+    trendingCard: {
+        borderRadius: Radius.xxl,
+        backgroundColor: Colors.surface,
+        overflow: 'hidden',
+        borderWidth: 1,
+        borderColor: Colors.divider,
+        flexDirection: 'row',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 12 },
+        shadowOpacity: 0.08,
+        shadowRadius: 20,
+        elevation: 6,
+        marginBottom: Spacing.lg,
+    },
+    trendingImage: {
+        width: 130,
+        height: 150,
+        resizeMode: 'cover',
+    },
+    trendingInfo: {
+        flex: 1,
+        padding: Spacing.md,
+        justifyContent: 'space-between',
+    },
+    trendingTag: {
+        ...Typography.label,
+        color: Colors.success,
+    },
+    trendingTitle: {
+        ...Typography.h3,
+        color: Colors.text,
+        marginBottom: Spacing.xs,
+    },
+    trendingMeta: {
+        ...Typography.body2,
+        color: Colors.textSecondary,
+    },
+    trendingActions: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
         marginTop: Spacing.sm,
-        backgroundColor: Colors.primary,
-        borderRadius: Radius.lg,
+    },
+    bookBtn: {
+        backgroundColor: Colors.success,
+        borderRadius: Radius.md,
+        paddingHorizontal: Spacing.lg,
         paddingVertical: Spacing.sm,
+    },
+    bookBtnText: {
+        ...Typography.body1,
+        color: '#fff',
+        fontWeight: '600' as const,
+    },
+    filterRow: {
+        flexDirection: 'row',
+        gap: Spacing.sm,
+        marginBottom: Spacing.md,
+    },
+    filterToggle: {
+        flex: 1,
+        borderRadius: Radius.xl,
+        borderWidth: 1,
+        borderColor: Colors.divider,
+        paddingVertical: Spacing.sm,
+        alignItems: 'center',
+    },
+    filterToggleActive: {
+        borderColor: Colors.success,
+        backgroundColor: '#EAFFF4',
+    },
+    toggleText: {
+        ...Typography.caption,
+        color: Colors.textSecondary,
+    },
+    toggleTextActive: {
+        color: Colors.success,
+        fontWeight: '600' as const,
+    },
+    categoryRow: {
+        paddingVertical: Spacing.sm,
+        paddingRight: Spacing.section,
+    },
+    categoryChip: {
+        borderRadius: Radius.xl,
+        borderWidth: 1,
+        borderColor: Colors.divider,
+        paddingHorizontal: Spacing.md,
+        paddingVertical: Spacing.xs,
+        marginRight: Spacing.md,
+        backgroundColor: Colors.surface,
+    },
+    categoryChipActive: {
+        borderColor: Colors.success,
+        backgroundColor: '#F0FFF9',
+    },
+    categoryText: {
+        ...Typography.caption,
+        color: Colors.textSecondary,
+    },
+    categoryTextActive: {
+        color: Colors.success,
+        fontWeight: '600' as const,
+    },
+    menuSection: {
+        marginTop: Spacing.md,
+        marginBottom: Spacing.lg,
+    },
+    emptyText: {
+        ...Typography.body2,
+        color: Colors.textSecondary,
+        textAlign: 'center',
+        marginVertical: Spacing.lg,
+    },
+    menuCard: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: Spacing.md,
+        borderRadius: Radius.xl,
+        backgroundColor: Colors.surface,
+        borderWidth: 1,
+        borderColor: Colors.divider,
+        marginBottom: Spacing.md,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.04,
+        shadowRadius: 12,
+        elevation: 3,
+    },
+    menuImage: {
+        width: 90,
+        height: 90,
+        borderRadius: Radius.md,
+        marginRight: Spacing.md,
+    },
+    menuContent: {
+        flex: 1,
+    },
+    menuTitle: {
+        ...Typography.h4,
+        color: Colors.text,
+    },
+    menuDesc: {
+        ...Typography.body2,
+        color: Colors.textSecondary,
+        marginVertical: Spacing.xs,
+    },
+    menuMetaRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
+    menuPrice: {
+        ...Typography.h4,
+        color: Colors.text,
+    },
+    menuRating: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: Spacing.xs / 2,
+    },
+    menuRatingText: {
+        ...Typography.caption,
+        color: Colors.textSecondary,
+    },
+    menuActions: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'flex-end',
+        marginTop: Spacing.sm,
+    },
+    menuAddBtn: {
+        backgroundColor: Colors.success,
+        borderRadius: Radius.xl,
+        paddingVertical: Spacing.xs,
         paddingHorizontal: Spacing.lg,
     },
-    qrBtnText: {
-        ...Typography.label,
-        color: '#FFF',
-        fontWeight: '700',
+    menuAddText: {
+        ...Typography.body2,
+        color: '#fff',
+        fontWeight: '600' as const,
+    },
+    qtyRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: Spacing.sm,
+    },
+    qtyBtn: {
+        padding: Spacing.xs,
+    },
+    qtyValue: {
+        ...Typography.body2,
+        color: Colors.text,
+        fontWeight: '700' as const,
+    },
+    cartSummary: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: Spacing.md,
+        borderRadius: Radius.xl,
+        backgroundColor: Colors.surface,
+        borderWidth: 1,
+        borderColor: Colors.divider,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.08,
+        shadowRadius: 20,
+        elevation: 6,
+        marginBottom: Spacing.md,
+    },
+    cartSummaryLabel: {
+        ...Typography.caption,
+        color: Colors.textSecondary,
+    },
+    cartSummaryPrice: {
+        ...Typography.body1,
+        color: Colors.text,
+        fontWeight: '700' as const,
     },
 });

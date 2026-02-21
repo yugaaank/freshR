@@ -1,8 +1,15 @@
 import { Ionicons } from '@expo/vector-icons';
-import Animated, { Layout } from 'react-native-reanimated';
 import React, { useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import {
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors, Radius, Shadows, Spacing, Typography } from '../src/theme';
+import { router } from 'expo-router';
 
 type Slot = {
   label: string;
@@ -37,12 +44,7 @@ export default function PrintRequestScreen() {
   const [document, setDocument] = useState<UploadedDoc | null>(null);
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [slotOpen, setSlotOpen] = useState(false);
-  const [qrPending, setQrPending] = useState(false);
-  const [qrScanned, setQrScanned] = useState(false);
-  const [qrCode, setQrCode] = useState('');
-  const [lastSlot, setLastSlot] = useState<string | null>(null);
   const slots = useMemo(() => generateTimeSlots(8, 18, 10), []);
 
   const handleUpload = () => {
@@ -61,125 +63,106 @@ export default function PrintRequestScreen() {
       setStatusMessage('Pick a 10-minute slot so the stationery team can prepare.');
       return;
     }
-    setIsSubmitting(true);
     setStatusMessage(null);
-    setTimeout(() => {
-      setIsSubmitting(false);
-      setStatusMessage(`Your PDF will be printed and ready to collect around ${selectedSlot}.`);
-      setQrPending(true);
-      setQrScanned(false);
-      setLastSlot(selectedSlot);
-      setQrCode(createQRCode('PRINT'));
-      setSelectedSlot(null);
-    }, 1200);
+    router.push({
+      pathname: '/print/payment',
+      params: {
+        doc: document.name,
+        slot: selectedSlot,
+      },
+    });
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-      <View style={styles.hero}>
-        <Ionicons name="print" size={32} color="#FFF" />
-        <Text style={styles.heroTitle}>Express Print Request</Text>
-        <Text style={styles.heroSubtitle}>
-          Upload your PDF and choose a 10-minute pickup window. Stationery will print on demand and have it ready
-          at the counter.
-        </Text>
-      </View>
+    <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: Colors.background }}>
+      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+        <View style={styles.hero}>
+          <Ionicons name="print" size={32} color="#FFF" />
+          <Text style={styles.heroTitle}>Express Print Request</Text>
+          <Text style={styles.heroSubtitle}>
+            Upload your PDF and choose a 10-minute pickup window. Stationery will print on demand and have it ready
+            at the counter.
+          </Text>
+        </View>
 
-      <View style={styles.sectionCard}>
-        <Text style={styles.sectionTitle}>Step 1 · Upload your document</Text>
-        <Text style={styles.sectionDesc}>Only PDF files are accepted today.</Text>
-        <TouchableOpacity style={styles.uploadBtn} onPress={handleUpload} activeOpacity={0.75}>
-          <Ionicons name="cloud-upload-outline" size={20} color={Colors.primary} />
-          <Text style={styles.uploadBtnText}>{document ? 'Replace PDF' : 'Upload PDF'}</Text>
-        </TouchableOpacity>
-        {document && (
-          <View style={styles.docPreview}>
-            <View>
-              <Text style={styles.docName}>{document.name}</Text>
-              <Text style={styles.docMeta}>{Math.max(Math.round((document.size ?? 0) / 1024), 1)} KB · PDF</Text>
+        <View style={styles.sectionCard}>
+          <Text style={styles.sectionTitle}>Step 1 · Upload your document</Text>
+          <Text style={styles.sectionDesc}>Only PDF files are accepted today.</Text>
+          <TouchableOpacity style={styles.uploadBtn} onPress={handleUpload} activeOpacity={0.75}>
+            <Ionicons name="cloud-upload-outline" size={20} color={Colors.primary} />
+            <Text style={styles.uploadBtnText}>{document ? 'Replace PDF' : 'Upload PDF'}</Text>
+          </TouchableOpacity>
+          {document && (
+            <View style={styles.docPreview}>
+              <View>
+                <Text style={styles.docName}>{document.name}</Text>
+                <Text style={styles.docMeta}>{Math.max(Math.round((document.size ?? 0) / 1024), 1)} KB · PDF</Text>
+              </View>
+              <Ionicons name="checkmark-circle" size={24} color={Colors.success} />
             </View>
-            <Ionicons name="checkmark-circle" size={24} color={Colors.success} />
-          </View>
-        )}
-      </View>
-
-      <View style={styles.sectionCard}>
-        <Text style={styles.sectionTitle}>Step 2 · Reserve your 10-min slot</Text>
-        <Text style={styles.sectionDesc}>
-          Stationery opens from 8:00 AM to 6:00 PM. We hold your print request for 10 minutes so you can collect it easily.
-        </Text>
-        <TouchableOpacity
-          style={[styles.dropdown, slotOpen && styles.dropdownActive]}
-          activeOpacity={0.8}
-          onPress={() => setSlotOpen((prev) => !prev)}
-        >
-          <Text style={[styles.dropdownLabel, selectedSlot ? styles.dropdownLabelActive : styles.dropdownPlaceholder]}>
-            {selectedSlot ?? 'Select a 10 min window'}
-          </Text>
-          <Ionicons name={slotOpen ? 'chevron-up' : 'chevron-down'} size={16} color={Colors.textSecondary} />
-        </TouchableOpacity>
-        {slotOpen && (
-          <View style={styles.dropdownList}>
-            <ScrollView nestedScrollEnabled style={{ maxHeight: 180 }}>
-              {slots.map((slot) => (
-                <TouchableOpacity
-                  key={slot.value}
-                  style={styles.dropdownItem}
-                  onPress={() => {
-                    setSelectedSlot(slot.value);
-                    setSlotOpen(false);
-                  }}
-                >
-                  <Text style={styles.dropdownItemText}>{slot.label}</Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
-        )}
-      </View>
-
-      <View style={styles.sectionCard}>
-        <Text style={styles.sectionTitle}>Step 3 · Confirm delivery</Text>
-        <Text style={styles.sectionDesc}>
-          Once submitted, stationery receives the PDF instantly and prints it before your selected window.
-        </Text>
-        <TouchableOpacity
-          style={[styles.scheduleBtn, isSubmitting && styles.scheduleBtnDisabled]}
-          activeOpacity={0.8}
-          onPress={handleSchedule}
-          disabled={isSubmitting}
-        >
-          <Text style={styles.scheduleText}>{isSubmitting ? 'Sending request…' : 'Send to Stationery'}</Text>
-        </TouchableOpacity>
-        {statusMessage && (
-          <Text style={[styles.statusMessage, statusMessage.startsWith('Your PDF') ? styles.statusSuccess : styles.statusError]}>
-            {statusMessage}
-          </Text>
-        )}
-      </View>
-      {qrPending && (
-        <Animated.View layout={Layout.springify()} style={[styles.qrCard, qrScanned && styles.qrCardCollected]}>
-          <Text style={styles.qrLabel}>Stationery QR</Text>
-          <Text style={styles.qrCode}>{qrCode}</Text>
-          <Text style={styles.qrSlot}>Slot: {lastSlot ?? '—'}</Text>
-          <Text style={styles.qrStatus}>
-            {qrScanned ? 'Collected by you.' : 'Pending collection — scan QR at counter.'}
-          </Text>
-          {!qrScanned && (
-            <TouchableOpacity
-              style={styles.qrBtn}
-              onPress={() => {
-                setQrScanned(true);
-                setStatusMessage('Print collected. Thanks!');
-                setTimeout(() => setQrPending(false), 1000);
-              }}
-            >
-              <Text style={styles.qrBtnText}>Scan</Text>
-            </TouchableOpacity>
           )}
-        </Animated.View>
-      )}
-    </ScrollView>
+        </View>
+
+        <View style={styles.sectionCard}>
+          <Text style={styles.sectionTitle}>Step 2 · Reserve your 10-min slot</Text>
+          <Text style={styles.sectionDesc}>
+            Stationery opens from 8:00 AM to 6:00 PM. We hold your print request for 10 minutes so you can collect it easily.
+          </Text>
+          <TouchableOpacity
+            style={[styles.dropdown, slotOpen && styles.dropdownActive]}
+            activeOpacity={0.8}
+            onPress={() => setSlotOpen((prev) => !prev)}
+          >
+            <Text style={[styles.dropdownLabel, selectedSlot ? styles.dropdownLabelActive : styles.dropdownPlaceholder]}>
+              {selectedSlot ?? 'Select a 10 min window'}
+            </Text>
+            <Ionicons name={slotOpen ? 'chevron-up' : 'chevron-down'} size={16} color={Colors.textSecondary} />
+          </TouchableOpacity>
+          {slotOpen && (
+            <View style={styles.dropdownList}>
+              <ScrollView nestedScrollEnabled style={{ maxHeight: 180 }}>
+                {slots.map((slot) => (
+                  <TouchableOpacity
+                    key={slot.value}
+                    style={styles.dropdownItem}
+                    onPress={() => {
+                      setSelectedSlot(slot.value);
+                      setSlotOpen(false);
+                    }}
+                  >
+                    <Text style={styles.dropdownItemText}>{slot.label}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+          )}
+        </View>
+
+        <View style={styles.sectionCard}>
+          <Text style={styles.sectionTitle}>Step 3 · Confirm delivery</Text>
+          <Text style={styles.sectionDesc}>
+            Once submitted, stationery receives the PDF instantly and prints it before your selected window. Proceed to pay to generate the pickup QR.
+          </Text>
+          <TouchableOpacity
+            style={styles.scheduleBtn}
+            activeOpacity={0.8}
+            onPress={handleSchedule}
+          >
+            <Text style={styles.scheduleText}>Proceed to payment</Text>
+          </TouchableOpacity>
+          {statusMessage && (
+            <Text
+              style={[
+                styles.statusMessage,
+                statusMessage.startsWith('Pick') ? styles.statusError : styles.statusSuccess,
+              ]}
+            >
+              {statusMessage}
+            </Text>
+          )}
+        </View>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
@@ -306,9 +289,6 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.md,
     alignItems: 'center',
   },
-  scheduleBtnDisabled: {
-    opacity: 0.6,
-  },
   scheduleText: {
     ...Typography.label,
     color: '#FFF',
@@ -323,42 +303,5 @@ const styles = StyleSheet.create({
   },
   statusError: {
     color: Colors.warning,
-  },
-  qrCard: {
-    borderRadius: Radius.xxl,
-    padding: Spacing.lg,
-    backgroundColor: '#FFF',
-    ...Shadows.sm,
-    alignItems: 'center',
-    marginBottom: Spacing.lg,
-  },
-  qrCardCollected: {
-    borderWidth: 1,
-    borderColor: Colors.success,
-  },
-  qrLabel: {
-    ...Typography.caption,
-    color: Colors.textSecondary,
-    marginBottom: Spacing.xs,
-  },
-  qrCode: {
-    ...Typography.h4,
-    marginBottom: Spacing.xs,
-  },
-  qrSlot: {
-    ...Typography.body2,
-    color: Colors.textSecondary,
-    marginBottom: Spacing.sm,
-  },
-  qrBtn: {
-    backgroundColor: Colors.primary,
-    paddingVertical: Spacing.sm,
-    paddingHorizontal: Spacing.lg,
-    borderRadius: Radius.lg,
-  },
-  qrBtnText: {
-    ...Typography.label,
-    color: '#FFF',
-    fontWeight: '700',
   },
 });

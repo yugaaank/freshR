@@ -1,723 +1,386 @@
 import { Ionicons } from '@expo/vector-icons';
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import { router } from 'expo-router';
+import dayjs from 'dayjs';
+import React, { useMemo, useState } from 'react';
 import {
-    Image,
+    ScrollView,
     SectionList,
+    StatusBar,
     StyleSheet,
     Text,
-    TextInput,
     TouchableOpacity,
     View,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Colors, Radius, Spacing, Typography } from '../../src/theme';
 import { events } from '../../src/data/events';
-import { Colors, Radius, Shadows, Spacing, Typography } from '../../src/theme';
 
-// ─── Constants ────────────────────────────────────────────────────────────────
+const TODAY = dayjs();
+const DATE_FORMAT = 'YYYY-MM-DD';
+const WEEKDAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const CARD_COLORS = ['#FCD34D', '#34D399', '#93C5FD', '#FCA5A5', '#A78BFA'];
 
+const eventsByDate = events.reduce<Record<string, typeof events>>((map, event) => {
+    map[event.date] = map[event.date] ?? [];
+    map[event.date].push(event);
+    return map;
+}, {});
 
-const TODAY_STR = '2025-02-20';
-const DAYS_SHORT = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
-const DAYS_ABBR = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December'];
-
-// ─── Category colors (light-mode friendly: subtle bg + dark text) ─────────────
-
-const CAT_COLORS: Record<string, { bg: string; border: string; text: string; meta: string }> = {
-    Tech: { bg: '#EEF2FF', border: '#6366F1', text: '#312E81', meta: '#6366F1' },
-    Music: { bg: '#FDF4FF', border: '#A855F7', text: '#581C87', meta: '#A855F7' },
-    Sports: { bg: '#F0FDF4', border: '#22C55E', text: '#14532D', meta: '#22C55E' },
-    Cultural: { bg: '#FFF7ED', border: '#F97316', text: '#7C2D12', meta: '#F97316' },
-    Workshop: { bg: '#EFF6FF', border: '#3B82F6', text: '#1E3A8A', meta: '#3B82F6' },
-    Academic: { bg: '#F0FDFA', border: '#14B8A6', text: '#134E4A', meta: '#14B8A6' },
-    Drama: { bg: '#FFF1F2', border: '#F43F5E', text: '#881337', meta: '#F43F5E' },
-};
-const DEFAULT_CAT = { bg: '#F5F5F5', border: Colors.primary, text: Colors.text, meta: Colors.primary };
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function toDateStr(y: number, m: number, d: number) {
-    return `${y} -${String(m + 1).padStart(2, '0')} -${String(d).padStart(2, '0')} `;
-}
-function daysInMonth(year: number, month: number) {
-    return new Date(year, month + 1, 0).getDate();
-}
-function firstDayOfMonth(year: number, month: number) {
-    return new Date(year, month, 1).getDay();
-}
-
-// ─── Build agenda sections ────────────────────────────────────────────────────
-
-interface AgendaSection {
-    title: string;        // "20 Feb, Thu"
-    dateStr: string;
-    isToday: boolean;
-    isNewMonth: boolean;
-    month: string;
-    data: typeof events;
-}
-
-function buildAgenda(): AgendaSection[] {
-    // Get all unique dates with events
-    const dateSet = new Set<string>();
-    events.forEach((e) => dateSet.add(e.date));
-    dateSet.add(TODAY_STR); // always include today
-
-    const sorted = Array.from(dateSet).sort();
-    let lastMonth = '';
-    const sections: AgendaSection[] = [];
-
-    for (const ds of sorted) {
-        const [y, m, d] = ds.split('-').map(Number);
-        const date = new Date(y, m - 1, d);
-        const dayEvents = events.filter((e) => e.date === ds);
-        if (dayEvents.length === 0 && ds !== TODAY_STR) continue; // skip empty days (except today)
-
-        const month = MONTHS[date.getMonth()];
-        const isNewMonth = month !== lastMonth;
-        if (isNewMonth) lastMonth = month;
-        const dayAbbr = DAYS_ABBR[date.getDay()];
-        const daySuffix = d === 1 || d === 21 || d === 31 ? 'st' : d === 2 || d === 22 ? 'nd' : d === 3 || d === 23 ? 'rd' : 'th';
-        sections.push({
-            title: `${d}${daySuffix} ${month.slice(0, 3)}, ${dayAbbr} `,
-            dateStr: ds,
-            isToday: ds === TODAY_STR,
-            isNewMonth,
-            month: `${month} ${y} `,
-            data: dayEvents,
+function buildWeekDays(date: dayjs.Dayjs) {
+    const startOfWeek = date.startOf('week');
+    const days = [];
+    for (let idx = 0; idx < 7; idx++) {
+        const day = startOfWeek.add(idx, 'day');
+        days.push({
+            label: WEEKDAY_NAMES[day.day()],
+            day,
+            dateStr: day.format(DATE_FORMAT),
         });
     }
-    return sections;
+    return days;
 }
 
-// ─── Mini Month Calendar ──────────────────────────────────────────────────────
-
-interface MiniCalProps {
-    year: number;
-    month: number;
-    selectedDate: string;
-    onSelect: (ds: string) => void;
-    eventDates: Set<string>;
-    eventsData: typeof events;
+function formatCardDate(dateStr?: string) {
+    return dateStr ? dayjs(dateStr).format('ddd • MMM D') : 'No date';
 }
-
-function MiniCal({ year, month, selectedDate, onSelect, eventDates, eventsData }: MiniCalProps) {
-    const totalDays = daysInMonth(year, month);
-    const firstDay = firstDayOfMonth(year, month);
-
-    // Build grid
-    const cells: (number | null)[] = Array(firstDay).fill(null);
-    for (let d = 1; d <= totalDays; d++) cells.push(d);
-    while (cells.length % 7 !== 0) cells.push(null);
-
-    const weeks = [];
-    for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7));
-
-    return (
-        <View style={mc.wrap}>
-            {/* Day-of-week header */}
-            <View style={mc.dayRow}>
-                {DAYS_SHORT.map((d, i) => (
-                    <Text key={i} style={mc.dayHead}>{d}</Text>
-                ))}
-            </View>
-            {/* Weeks */}
-            {weeks.map((week, wi) => (
-                <View key={wi} style={mc.weekRow}>
-                    {week.map((day, di) => {
-                        if (day === null) return <View key={di} style={mc.cell} />;
-                        const ds = toDateStr(year, month, day);
-                        const isToday = ds === TODAY_STR;
-                        const isSelected = ds === selectedDate;
-                        const hasEvent = eventDates.has(ds);
-                        return (
-                            <TouchableOpacity
-                                key={di}
-                                style={mc.cell}
-                                onPress={() => onSelect(ds)}
-                                activeOpacity={0.7}
-                            >
-                                <View style={[
-                                    mc.dayCircle,
-                                    isToday && mc.todayCircle,
-                                    isSelected && !isToday && mc.selectedCircle,
-                                ]}>
-                                    <Text style={[
-                                        mc.dayNum,
-                                        isToday && mc.todayNum,
-                                        isSelected && !isToday && mc.selectedNum,
-                                    ]}>{day}</Text>
-                                </View>
-                                {hasEvent && (
-                                    <View style={[
-                                        mc.dot,
-                                        isToday && mc.dotToday,
-                                        !isToday && { backgroundColor: CAT_COLORS[eventsData.find(e => e.date === ds)?.category ?? 'Tech']?.meta ?? Colors.primary }
-                                    ]} />
-                                )}
-                            </TouchableOpacity>
-                        );
-                    })}
-                </View>
-            ))}
-        </View>
-    );
-}
-
-const mc = StyleSheet.create({
-    wrap: { paddingHorizontal: Spacing.section, paddingBottom: Spacing.sm },
-    dayRow: { flexDirection: 'row', marginBottom: 4 },
-    dayHead: { flex: 1, textAlign: 'center', ...Typography.micro, color: Colors.textTertiary, fontWeight: '600' as const },
-    weekRow: { flexDirection: 'row' },
-    cell: { flex: 1, alignItems: 'center', paddingVertical: 3 },
-    dayCircle: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
-    todayCircle: { backgroundColor: Colors.primary },
-    selectedCircle: { backgroundColor: Colors.surface, borderWidth: 1.5, borderColor: Colors.primary },
-    dayNum: { ...Typography.caption, color: Colors.text, fontWeight: '500' as const },
-    todayNum: { color: '#FFF', fontWeight: '700' as const },
-    selectedNum: { color: Colors.primary, fontWeight: '700' as const },
-    dot: { width: 4, height: 4, borderRadius: 2, backgroundColor: Colors.primary, marginTop: 1 },
-    dotToday: { backgroundColor: 'rgba(255,107,53,0.5)' },
-});
-
-// ─── Screen ───────────────────────────────────────────────────────────────────
-
-const SECTIONS = buildAgenda();
-const EVENT_DATE_SET = new Set(events.map((e) => e.date));
 
 export default function CalendarScreen() {
-    const today = new Date();
-    const initialDateString = today.toISOString().split('T')[0];
-    const [calYear, setCalYear] = useState(today.getFullYear());
-    const [calMonth, setCalMonth] = useState(today.getMonth());
-    const [selectedDate, setSelectedDate] = useState(initialDateString);
-    const [viewMode, setViewMode] = useState<'upcoming' | 'calendar'>('upcoming');
-    const [search, setSearch] = useState('');
-    const [isSearching, setIsSearching] = useState(false);
-    const toggleViewMode = useCallback(() => {
-        setViewMode((mode) => (mode === 'upcoming' ? 'calendar' : 'upcoming'));
-    }, []);
-    const listRef = useRef<SectionList>(null);
+    const [selectedDate, setSelectedDate] = useState(TODAY.format(DATE_FORMAT));
+    const [viewMode, setViewMode] = useState<'today' | 'all'>('today');
+    const todayEvents = eventsByDate[selectedDate] ?? [];
+    const timelineCards = useMemo(() => events.slice(0, CARD_COLORS.length), []);
 
-    const monthLabel = `${MONTHS[calMonth]} ${calYear} `;
-    const todayEvents = events.filter((e) => e.date === TODAY_STR).length;
-    const highlightEvent = useMemo(() => events.find((e) => e.date === TODAY_STR) ?? events[0], []);
-
-    const renderHeroHeader = () => (
-        <>
-            <View style={styles.calendarHeroWrap}>
-                <LinearGradient colors={['#170f33', '#1c1a4b']} style={styles.calendarHero}>
-                    <Text style={styles.calendarHeroTitle}>Campus calendar</Text>
-                    <Text style={styles.calendarHeroSub}>Stay ahead of deadlines & club alerts</Text>
-                    <View style={styles.calendarHeroStats}>
-                        <View>
-                            <Text style={styles.calendarHeroValue}>{events.length}</Text>
-                            <Text style={styles.calendarHeroLabel}>Total events</Text>
-                        </View>
-                        <View>
-                            <Text style={styles.calendarHeroValue}>{todayEvents}</Text>
-                            <Text style={styles.calendarHeroLabel}>Today</Text>
-                        </View>
-                        <View>
-                            <Text style={styles.calendarHeroValue}>{EVENT_DATE_SET.size}</Text>
-                            <Text style={styles.calendarHeroLabel}>Event days</Text>
-                        </View>
-                    </View>
-                    <View style={styles.highlightCard}>
-                        <Text style={styles.highlightLabel}>Next up</Text>
-                        <Text style={styles.highlightTitle} numberOfLines={1}>
-                            {highlightEvent.emoji ? `${highlightEvent.emoji} ` : ''}{highlightEvent.title}
-                        </Text>
-                        <Text style={styles.highlightMeta}>{highlightEvent.date} · {highlightEvent.time}</Text>
-                    </View>
-                </LinearGradient>
-            </View>
-
-            <View style={styles.header}>
-                {isSearching ? (
-                    <View style={styles.searchBarActive}>
-                        <Ionicons name="search" size={18} color={Colors.textTertiary} />
-                        <TextInput
-                            autoFocus
-                            style={styles.searchInput}
-                            placeholder="Search events..."
-                            placeholderTextColor={Colors.textTertiary}
-                            value={search}
-                            onChangeText={setSearch}
-                        />
-                        <TouchableOpacity onPress={() => { setIsSearching(false); setSearch(''); }}>
-                            <Ionicons name="close-circle" size={20} color={Colors.textTertiary} />
-                        </TouchableOpacity>
-                    </View>
-                ) : (
-                    <>
-                        <View style={styles.headerLeft}>
-                            <Text style={styles.headerMonth}>{monthLabel}</Text>
-                        </View>
-                        <View style={styles.headerRight}>
-                            <TouchableOpacity onPress={() => setIsSearching(true)} style={styles.navBtn}>
-                                <Ionicons name="search-outline" size={18} color={Colors.textSecondary} />
-                            </TouchableOpacity>
-                            <TouchableOpacity onPress={prevMonth} style={styles.navBtn}>
-                                <Ionicons name="chevron-back" size={18} color={Colors.textSecondary} />
-                            </TouchableOpacity>
-                            <TouchableOpacity onPress={nextMonth} style={styles.navBtn}>
-                                <Ionicons name="chevron-forward" size={18} color={Colors.textSecondary} />
-                            </TouchableOpacity>
-                            <TouchableOpacity onPress={toggleViewMode} style={[styles.viewToggleBtn, viewMode === 'calendar' && styles.viewToggleActive]}>
-                                <Text style={[styles.viewToggleText, viewMode === 'calendar' && styles.viewToggleTextActive]}>
-                                    {viewMode === 'calendar' ? 'Show Upcoming' : 'Show Calendar'}
-                                </Text>
-                            </TouchableOpacity>
-                            <View style={styles.avatar}>
-                                <Text style={styles.avatarText}>Y</Text>
-                            </View>
-                        </View>
-                    </>
-                )}
-            </View>
-        </>
+    const sections = useMemo(
+        () =>
+            Object.entries(eventsByDate)
+                .sort(([a], [b]) => (a > b ? 1 : -1))
+                .map(([date, items]) => ({
+                    title: dayjs(date).format('ddd, MMM D'),
+                    data: items,
+                })),
+        []
     );
 
-    const renderListHeader = () => (
-        <>
-            {renderHeroHeader()}
-            <View style={styles.divider}>
-                <Text style={styles.dividerText}>UPCOMING EVENTS</Text>
-            </View>
-        </>
+    const weekRow = (
+        <View style={styles.scrollRow}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                {buildWeekDays(TODAY).map((day) => (
+                    <TouchableOpacity
+                        key={day.dateStr}
+                        style={[
+                            styles.weekDay,
+                            selectedDate === day.dateStr && styles.weekDayActive,
+                        ]}
+                        onPress={() => setSelectedDate(day.dateStr)}
+                    >
+                        <Text style={styles.weekDayLabel}>{day.label}</Text>
+                        <Text style={styles.weekDayDate}>{day.day.date()}</Text>
+                    </TouchableOpacity>
+                ))}
+            </ScrollView>
+        </View>
     );
 
-    const searchLower = search.trim().toLowerCase();
-
-    // Filter sections based on search
-    const filteredSections = useMemo(() => {
-        if (!searchLower) return SECTIONS;
-        return SECTIONS.map(sec => ({
-            ...sec,
-            data: sec.data.filter(ev =>
-                ev.title.toLowerCase().includes(searchLower) ||
-                ev.category.toLowerCase().includes(searchLower)
-            )
-        })).filter(sec => sec.data.length > 0);
-    }, [searchLower]);
-
-    const prevMonth = useCallback(() => {
-        setCalMonth((m) => { if (m === 0) { setCalYear((y) => y - 1); return 11; } return m - 1; });
-    }, []);
-    const nextMonth = useCallback(() => {
-        setCalMonth((m) => { if (m === 11) { setCalYear((y) => y + 1); return 0; } return m + 1; });
-    }, []);
-
-    const handleDaySelect = useCallback((ds: string) => {
-        setSelectedDate(ds);
-        const idx = SECTIONS.findIndex((s) => s.dateStr === ds);
-        if (idx !== -1 && listRef.current) {
-            listRef.current.scrollToLocation({ sectionIndex: idx, itemIndex: 0, animated: true, viewOffset: 0 });
-        }
-    }, []);
-
-    const detailEvents = useMemo(() => events.filter((e) => e.date === selectedDate), [selectedDate]);
-    const selectedDateLabel = useMemo(() => {
-        const [y, m, d] = selectedDate.split('-').map(Number);
-        if (!y || isNaN(m) || isNaN(d)) return 'Selected day';
-        return `${d} ${MONTHS[m - 1]} ${y}`;
-    }, [selectedDate]);
-
-    const renderEventCard = (ev: typeof events[number]) => {
-        const col = CAT_COLORS[ev.category] ?? DEFAULT_CAT;
-        return (
-            <TouchableOpacity
-                key={ev.id}
-                activeOpacity={0.85}
-                style={[styles.eventCard, { borderLeftColor: col.border }]}
-            >
-                <View style={[styles.eventCardBg, { backgroundColor: col.bg }]}>
-                    <View style={styles.eventCardTop}>
-                        <View style={[styles.catPill, { backgroundColor: col.border }]}>
-                            <Ionicons name="pricetag" size={10} color="#FFF" style={{ marginRight: 4 }} />
-                            <Text style={styles.catPillText}>{ev.category}</Text>
-                        </View>
-                        {ev.seatsLeft <= 15 && (
-                            <View style={styles.urgencyPill}>
-                                <Text style={styles.urgencyText}>⚡ {ev.seatsLeft} left</Text>
-                            </View>
-                        )}
-                    </View>
-                    <Text style={[styles.eventTitle, { color: col.text }]} numberOfLines={2}>
-                        {ev.emoji ? `${ev.emoji} ` : ''}{ev.title}
-                    </Text>
-                    <View style={styles.eventMeta}>
-                        <Ionicons name="time-outline" size={12} color={col.meta} />
-                        <Text style={[styles.eventMetaText, { color: col.meta }]}>{ev.time}</Text>
-                        <Text style={styles.eventMetaDot}>·</Text>
-                        <Ionicons name="location-outline" size={12} color={col.meta} />
-                        <Text style={[styles.eventMetaText, { color: col.meta }]}>{ev.venue}</Text>
-                    </View>
+    const cardsRow = (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.cardsRow}>
+            {(viewMode === 'today' ? todayEvents : timelineCards).map((eventItem, idx) => (
+                <TouchableOpacity
+                    key={`card-${idx}`}
+                    style={[styles.card, { backgroundColor: CARD_COLORS[idx % CARD_COLORS.length] }]}
+                    onPress={() => eventItem?.id && router.push(`/event/${eventItem.id}`)}
+                    activeOpacity={0.85}
+                >
+                    <Text style={styles.cardDate}>{formatCardDate(eventItem?.date)}</Text>
+                    <Text style={styles.cardTitle}>{eventItem?.title}</Text>
+                    <Text style={styles.cardMeta}>{eventItem?.time}</Text>
+                </TouchableOpacity>
+            ))}
+            {viewMode === 'today' && todayEvents.length === 0 && (
+                <View style={[styles.card, { backgroundColor: Colors.surface }]}>
+                    <Text style={styles.cardTitle}>No entries scheduled</Text>
+                    <Text style={styles.cardMeta}>Plan something for today!</Text>
                 </View>
-            </TouchableOpacity>
-        );
-    };
+            )}
+        </ScrollView>
+    );
 
-
-
-    if (viewMode === 'calendar') {
-        return (
-            <SafeAreaView style={styles.safe} edges={['top']}>
-                {renderHeroHeader()}
-                <View style={styles.calendarModeWrap}>
-                    <View style={styles.calCard}>
-                        <MiniCal
-                            year={calYear}
-                            month={calMonth}
-                            selectedDate={selectedDate}
-                            onSelect={handleDaySelect}
-                            eventDates={EVENT_DATE_SET}
-                            eventsData={events}
-                        />
-                    </View>
-                    <View style={styles.calendarDivider}>
-                        <Text style={styles.calendarDividerText}>{selectedDateLabel}</Text>
-                    </View>
-                    {detailEvents.length > 0 ? (
-                        detailEvents.map((ev) => renderEventCard(ev))
-                    ) : (
-                        <View style={styles.calendarEmpty}>
-                            <Text style={styles.calendarEmptyTitle}>No events scheduled</Text>
-                            <Text style={styles.calendarEmptySub}>Try another day or switch to upcoming events.</Text>
-                        </View>
-                    )}
-                </View>
-            </SafeAreaView>
-        );
-    }
+    const listHeader = (
+        <>
+            {weekRow}
+            <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Events • {TODAY.format('MMM D')}</Text>
+            </View>
+            {cardsRow}
+        </>
+    );
 
     return (
         <SafeAreaView style={styles.safe} edges={['top']}>
-            <SectionList
-                ref={listRef}
-                sections={filteredSections}
-                keyExtractor={(item) => item.id}
-                showsVerticalScrollIndicator={false}
-                stickySectionHeadersEnabled={false}
-                contentContainerStyle={styles.listContent}
-                ListHeaderComponent={renderListHeader}
-                renderSectionHeader={({ section }) => (
-                    <View>
-                        {section.isNewMonth && (
-                            <View style={styles.monthBadge}>
-                                <Text style={styles.monthBadgeText}>{section.month}</Text>
-                            </View>
-                        )}
-                        <View style={[
-                            styles.dayHeader,
-                            section.isToday && styles.dayHeaderToday,
-                        ]}>
-                            <View style={[
-                                styles.dayNumCircle,
-                                section.isToday && styles.dayNumCircleToday,
-                            ]}>
-                                <Text style={[styles.dayNumBig, section.isToday && styles.dayNumBigToday]}>
-                                    {section.dateStr.split('-')[2].replace(/^0/, '')}
-                                </Text>
-                            </View>
-                            <View>
-                                <Text style={[styles.dayHeaderTitle, section.isToday && styles.dayHeaderTitleToday]}>
-                                    {section.title.split(',')[1]?.trim() ?? ''} {section.isToday ? '· Today' : ''}
-                                </Text>
-                                <Text style={styles.dayEventCount}>
-                                    {section.data.length === 0
-                                        ? 'No events'
-                                        : `${section.data.length} event${section.data.length > 1 ? 's' : ''} `}
-                                </Text>
-                            </View>
-                        </View>
-                    </View>
-                )}
-                ListEmptyComponent={() => (
-                    <View style={styles.emptyState}>
-                        <Image
-                            source={{ uri: 'https://cdn3d.iconscout.com/3d/premium/thumb/empty-box-4200742-3498864.png' }}
-                            style={styles.emptyStateImg}
-                        />
-                        <Text style={styles.emptyStateTitle}>No events on this day</Text>
-                        <Text style={styles.emptyStateSub}>Take a break or check other days!</Text>
-                    </View>
-                )}
-                renderItem={({ item: ev }) => renderEventCard(ev)}
-            />
+            <StatusBar style="dark" />
+            <View style={styles.header}>
+                <View>
+                    <Text style={styles.headerLabel}>Good Morning</Text>
+                    <Text style={styles.headerTitle}>Campus Planner</Text>
+                </View>
+            </View>
+            <View style={styles.viewToggleRow}>
+                {['today', 'all'].map((mode) => (
+                    <TouchableOpacity
+                        key={mode}
+                        style={[
+                            styles.viewToggleBtn,
+                            viewMode === mode && styles.viewToggleBtnActive,
+                        ]}
+                        onPress={() => {
+                            setViewMode(mode as typeof viewMode);
+                            if (mode === 'today') {
+                                setSelectedDate(TODAY.format(DATE_FORMAT));
+                            }
+                        }}
+                    >
+                        <Text
+                            style={[
+                                styles.viewToggleText,
+                                viewMode === mode && styles.viewToggleTextActive,
+                            ]}
+                        >
+                            {mode === 'today' ? 'Today' : 'Full'}
+                        </Text>
+                    </TouchableOpacity>
+                ))}
+            </View>
 
-            {/* ═══ FAB ═══ */}
-            <TouchableOpacity style={styles.fab}>
-                <Ionicons name="add" size={26} color="#FFF" />
-            </TouchableOpacity>
+            {viewMode === 'today' ? (
+                <ScrollView contentContainerStyle={styles.content}>
+                    {weekRow}
+                    <View style={styles.section}>
+                        <Text style={styles.sectionTitle}>Events • {TODAY.format('MMM D')}</Text>
+                    </View>
+                    {cardsRow}
+                    <View style={styles.agenda}>
+                        <Text style={styles.agendaTitle}>Agenda</Text>
+                        {todayEvents.map((event) => (
+                            <View key={event.id} style={styles.agendaCard}>
+                                <View style={styles.agendaMeta}>
+                                    <Text style={styles.agendaTime}>{event.time}</Text>
+                                    <Text style={styles.agendaLocation}>{event.location}</Text>
+                                </View>
+                                <Text style={styles.agendaTitleCard}>{event.title}</Text>
+                                <Text style={styles.agendaCategory}>{event.category}</Text>
+                            </View>
+                        ))}
+                        {!todayEvents.length && (
+                            <Text style={styles.empty}>No meetings today — unwind!</Text>
+                        )}
+                    </View>
+                </ScrollView>
+            ) : (
+                <SectionList
+                    sections={sections}
+                    keyExtractor={(item) => item.id}
+                    ListHeaderComponent={listHeader}
+                    renderSectionHeader={({ section }) => (
+                        <Text style={styles.sectionHeader}>{section.title}</Text>
+                    )}
+                    renderItem={({ item }) => (
+                        <TouchableOpacity
+                            style={styles.listItem}
+                            activeOpacity={0.85}
+                            onPress={() => router.push(`/event/${item.id}`)}
+                        >
+                            <View>
+                                <Text style={styles.listTitle}>{item.title}</Text>
+                                <Text style={styles.listMeta}>{item.time} · {item.location}</Text>
+                            </View>
+                            <Ionicons name="arrow-forward" size={18} color={Colors.textSecondary} />
+                        </TouchableOpacity>
+                    )}
+                    contentContainerStyle={styles.listContent}
+                    ItemSeparatorComponent={() => <View style={styles.separator} />}
+                />
+            )}
         </SafeAreaView>
     );
 }
 
-// ─── Styles ──────────────────────────────────────────────────────────────────
-
 const styles = StyleSheet.create({
-    safe: { flex: 1, backgroundColor: '#F7F7F8' },
-    calendarHeroWrap: {
-        paddingHorizontal: Spacing.section,
-        paddingTop: Spacing.sm,
-    },
-    calendarHero: {
-        borderRadius: Radius.xxl,
-        padding: Spacing.lg,
-        borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.2)',
-        overflow: 'hidden',
-        ...Shadows.lg,
-    },
-    calendarHeroTitle: {
-        ...Typography.h3,
-        color: '#FFF',
-    },
-    calendarHeroSub: {
-        ...Typography.body2,
-        color: 'rgba(255,255,255,0.75)',
-        marginBottom: Spacing.sm,
-    },
-    calendarHeroStats: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        marginBottom: Spacing.sm,
-    },
-    calendarHeroValue: {
-        ...Typography.h3,
-        color: '#FFF',
-    },
-    calendarHeroLabel: {
-        ...Typography.caption,
-        color: 'rgba(255,255,255,0.7)',
-    },
-    highlightCard: {
-        marginTop: Spacing.sm,
-        backgroundColor: 'rgba(255,255,255,0.1)',
-        borderRadius: Radius.xl,
-        padding: Spacing.md,
-    },
-    highlightLabel: {
-        ...Typography.micro,
-        color: 'rgba(255,255,255,0.65)',
-    },
-    highlightTitle: {
-        ...Typography.h4,
-        color: '#FFF',
-        marginVertical: Spacing.xs,
-    },
-    highlightMeta: {
-        ...Typography.caption,
-        color: 'rgba(255,255,255,0.8)',
-    },
-
-    // Header
+    safe: { flex: 1, backgroundColor: Colors.background },
     header: {
         flexDirection: 'row',
-        alignItems: 'center',
         justifyContent: 'space-between',
-        paddingHorizontal: Spacing.section,
-        paddingVertical: Spacing.sm,
-        backgroundColor: '#FFF',
-        borderBottomWidth: 1,
-        borderBottomColor: Colors.border,
-    },
-    headerLeft: { flex: 1 },
-    headerMonth: { ...Typography.h3, color: Colors.text },
-    headerRight: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-    searchBarActive: {
-        flex: 1,
-        flexDirection: 'row',
+        padding: Spacing.section,
         alignItems: 'center',
-        backgroundColor: Colors.surface,
-        borderRadius: Radius.pill,
-        paddingHorizontal: Spacing.md,
-        height: 40,
-        gap: 8,
     },
-    searchInput: {
-        flex: 1,
+    headerLabel: {
         ...Typography.body2,
-        color: Colors.text,
-        padding: 0,
+        color: Colors.textSecondary,
     },
-    navBtn: {
-        width: 32, height: 32, borderRadius: 16,
-        alignItems: 'center', justifyContent: 'center',
-        backgroundColor: Colors.surface,
+    headerTitle: {
+        ...Typography.h2,
+        color: Colors.text,
+    },
+    viewToggleRow: {
+        flexDirection: 'row',
+        justifyContent: 'center',
+        paddingHorizontal: Spacing.section,
+        gap: Spacing.sm,
+        marginBottom: Spacing.lg,
     },
     viewToggleBtn: {
-        paddingHorizontal: Spacing.md,
-        paddingVertical: Spacing.xs,
-        borderRadius: Radius.xl,
+        paddingVertical: Spacing.sm,
+        paddingHorizontal: Spacing.lg,
+        borderRadius: Radius.xxl,
         backgroundColor: Colors.surface,
     },
-    viewToggleActive: {
-        backgroundColor: Colors.primary,
+    viewToggleBtnActive: {
+        backgroundColor: Colors.success,
     },
     viewToggleText: {
-        ...Typography.caption,
-        color: Colors.textSecondary,
-        fontWeight: '700' as const,
+        ...Typography.body2,
+        color: Colors.text,
     },
     viewToggleTextActive: {
-        color: '#FFF',
-    },
-    avatar: {
-        width: 32, height: 32, borderRadius: 16,
-        backgroundColor: '#34A853',
-        alignItems: 'center', justifyContent: 'center',
-        marginLeft: 4,
-    },
-    avatarText: { ...Typography.label, color: '#FFF', fontWeight: '700' as const },
-
-    // Mini calendar card
-    calCard: {
-        backgroundColor: '#FFF',
-        borderBottomWidth: 1,
-        borderBottomColor: Colors.border,
-        paddingTop: Spacing.sm,
-    },
-    calendarModeWrap: {
-        flex: 1,
-        paddingBottom: Spacing.md,
-    },
-    calendarDivider: {
-        paddingHorizontal: Spacing.section,
-        paddingVertical: Spacing.sm,
-        backgroundColor: '#F3F3F7',
-    },
-    calendarDividerText: {
-        ...Typography.h4,
-        color: Colors.textSecondary,
-    },
-
-    // Divider
-    divider: {
-        paddingHorizontal: Spacing.section,
-        paddingVertical: Spacing.sm,
-        backgroundColor: '#F7F7F8',
-    },
-    dividerText: {
-        ...Typography.micro,
-        color: Colors.textTertiary,
-        letterSpacing: 1.2,
-        fontWeight: '700' as const,
-    },
-
-    // Agenda list
-    listContent: { paddingBottom: 100 },
-
-    // Month badge
-    monthBadge: {
-        marginHorizontal: Spacing.section,
-        marginTop: Spacing.md,
-        marginBottom: Spacing.xs,
-        alignSelf: 'flex-start',
-        backgroundColor: Colors.primary,
-        borderRadius: Radius.pill,
-        paddingHorizontal: 12,
-        paddingVertical: 4,
-    },
-    monthBadgeText: { ...Typography.label, color: '#FFF', fontWeight: '700' as const, fontSize: 11 },
-
-    // Day header
-    dayHeader: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: Spacing.sm,
-        paddingHorizontal: Spacing.section,
-        paddingTop: Spacing.md,
-        paddingBottom: Spacing.xs,
-    },
-    dayHeaderToday: {},
-    dayNumCircle: {
-        width: 40, height: 40, borderRadius: 20,
-        backgroundColor: '#ECECEC',
-        alignItems: 'center', justifyContent: 'center',
-    },
-    dayNumCircleToday: { backgroundColor: Colors.primary },
-    dayNumBig: { ...Typography.h4, color: Colors.text, fontWeight: '700' as const },
-    dayNumBigToday: { color: '#FFF' },
-    dayHeaderTitle: { ...Typography.label, color: Colors.textSecondary, fontSize: 13 },
-    dayHeaderTitleToday: { color: Colors.primary, fontWeight: '700' as const },
-    dayEventCount: { ...Typography.micro, color: Colors.textTertiary, marginTop: 1 },
-
-    // Event cards (Apple Calendar style: left colored border + subtle bg)
-    eventCard: {
-        marginHorizontal: Spacing.section,
-        marginBottom: Spacing.sm,
-        borderRadius: Radius.lg,
-        borderLeftWidth: 4,
-        overflow: 'hidden',
-        ...Shadows.sm,
-    },
-    eventCardBg: {
-        padding: Spacing.md,
-        gap: 6,
-    },
-    eventCardTop: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 8,
-    },
-    eventTime: {
-        ...Typography.caption,
-        color: Colors.textSecondary,
+        color: '#fff',
         fontWeight: '600' as const,
     },
-    catPill: {
-        borderRadius: Radius.pill,
-        paddingHorizontal: 8,
-        paddingVertical: 3,
-        flexDirection: 'row',
-        alignItems: 'center',
+    content: {
+        paddingBottom: Spacing.xxxl,
+        paddingTop: Spacing.sm,
     },
-    catPillText: { ...Typography.micro, color: '#FFF', fontWeight: '700' as const, fontSize: 9 },
-    urgencyPill: {
-        backgroundColor: '#FFF3E8',
-        borderRadius: Radius.pill,
-        paddingHorizontal: 8,
-        paddingVertical: 2,
-    },
-    urgencyText: { ...Typography.micro, color: Colors.primary, fontWeight: '700' as const, fontSize: 9 },
-    eventTitle: { ...Typography.h5, lineHeight: 20 },
-    eventMeta: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-    eventMetaText: { ...Typography.micro, fontSize: 11 },
-    eventMetaDot: { ...Typography.micro, color: Colors.textTertiary },
-
-    // FAB
-    fab: {
-        position: 'absolute',
-        bottom: 28,
-        right: Spacing.section,
-        width: 56, height: 56, borderRadius: 28,
-        backgroundColor: Colors.primary,
-        alignItems: 'center', justifyContent: 'center',
-        ...Shadows.colored(Colors.primary),
-    },
-    emptyState: { alignItems: 'center', justifyContent: 'center', padding: Spacing.xl, marginTop: Spacing.lg },
-    emptyStateImg: { width: 120, height: 120, opacity: 0.8, marginBottom: Spacing.md },
-    emptyStateTitle: { ...Typography.h4, color: Colors.text, marginBottom: 4 },
-    emptyStateSub: { ...Typography.body2, color: Colors.textSecondary, textAlign: 'center' },
-    calendarEmpty: {
+    scrollRow: {
         paddingHorizontal: Spacing.section,
-        paddingVertical: Spacing.md,
+        paddingBottom: Spacing.sm,
+    },
+    weekDay: {
+        marginRight: Spacing.sm,
         alignItems: 'center',
-        justifyContent: 'center',
+        padding: Spacing.sm,
+        borderRadius: Radius.xl,
+        backgroundColor: Colors.surface,
+        borderWidth: 1,
+        borderColor: Colors.divider,
+        width: 74,
     },
-    calendarEmptyTitle: {
-        ...Typography.h4,
+    weekDayActive: {
+        backgroundColor: Colors.success,
+        borderColor: Colors.success,
+    },
+    weekDayLabel: {
+        ...Typography.caption,
         color: Colors.textSecondary,
-        marginBottom: Spacing.xs,
     },
-    calendarEmptySub: {
+    weekDayDate: {
+        ...Typography.h4,
+        color: Colors.text,
+    },
+    section: {
+        marginTop: Spacing.md,
+        paddingHorizontal: Spacing.section,
+        marginBottom: Spacing.md,
+    },
+    sectionTitle: {
+        ...Typography.h4,
+        color: Colors.text,
+    },
+    cardsRow: {
+        paddingHorizontal: Spacing.section,
+        marginTop: Spacing.md,
+        paddingBottom: Spacing.md,
+    },
+    card: {
+        width: 240,
+        borderRadius: Radius.xxl,
+        padding: Spacing.lg,
+        marginRight: Spacing.md,
+    },
+    cardDate: {
         ...Typography.body2,
-        color: Colors.textTertiary,
+        color: '#0F172A',
+    },
+    cardTitle: {
+        ...Typography.h3,
+        marginTop: Spacing.sm,
+        color: '#0F172A',
+    },
+    cardMeta: {
+        ...Typography.body2,
+        color: '#0F172A',
+        marginTop: Spacing.xs,
+    },
+    agenda: {
+        marginTop: Spacing.lg,
+        paddingHorizontal: Spacing.section,
+        paddingBottom: Spacing.xxxl,
+    },
+    agendaTitle: {
+        ...Typography.h4,
+        color: Colors.text,
+    },
+    agendaCard: {
+        marginTop: Spacing.md,
+        borderRadius: Radius.xxl,
+        padding: Spacing.md,
+        backgroundColor: Colors.surface,
+        borderWidth: 1,
+        borderColor: Colors.divider,
+    },
+    agendaMeta: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+    },
+    agendaTime: {
+        ...Typography.caption,
+        color: Colors.textSecondary,
+    },
+    agendaLocation: {
+        ...Typography.caption,
+        color: Colors.textSecondary,
+    },
+    agendaTitleCard: {
+        ...Typography.body1,
+        color: Colors.text,
+        marginTop: Spacing.xs,
+    },
+    agendaCategory: {
+        ...Typography.caption,
+        color: Colors.success,
+        marginTop: Spacing.xs,
+    },
+    empty: {
+        ...Typography.body2,
+        color: Colors.textSecondary,
+        marginTop: Spacing.md,
         textAlign: 'center',
+    },
+    sectionHeader: {
+        ...Typography.h5,
+        marginTop: Spacing.md,
+        marginBottom: Spacing.xs,
+        marginLeft: Spacing.section,
+        color: Colors.text,
+    },
+    listItem: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingVertical: Spacing.sm,
+        paddingHorizontal: Spacing.section,
+        backgroundColor: Colors.surface,
+    },
+    listTitle: {
+        ...Typography.body1,
+        color: Colors.text,
+    },
+    listMeta: {
+        ...Typography.caption,
+        color: Colors.textSecondary,
+    },
+    listContent: {
+        paddingBottom: Spacing.xxxl,
+    },
+    separator: {
+        height: 1,
+        backgroundColor: Colors.divider,
+        marginHorizontal: Spacing.section,
     },
 });
