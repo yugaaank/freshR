@@ -3,6 +3,7 @@ import { create } from 'zustand';
 import type { Profile } from '../lib/db/profile';
 import { getProfile } from '../lib/db/profile';
 import { supabase } from '../lib/supabase';
+import { getRegisteredEventIds } from '../lib/db/events';
 
 export type Interest =
     | 'Tech' | 'Design' | 'Music' | 'Sports' | 'Literature'
@@ -72,49 +73,57 @@ export const useUserStore = create<UserStore>((set, get) => ({
         const { data: { session } } = await supabase.auth.getSession();
         
         if (session?.user) {
-            console.log('[Store Debug] Session found during hydration');
-            let profile = await getProfile(session.user.id).catch(() => null);
+            const uid = session.user.id;
+            let profile = await getProfile(uid).catch(() => null);
+            
             if (!profile) {
-                // Fallback for demo if profile somehow wasn't created
-                profile = {
-                    id: session.user.id,
+                // Upsert a basic profile to the DB to ensure foreign keys work
+                const newProfile = {
+                    id: uid,
                     name: session.user.email?.split('@')[0] || 'User',
                     college: 'Campus',
                     branch: 'General',
                     year: 1,
-                } as any;
+                    updated_at: new Date().toISOString(),
+                };
+                await supabase.from('profiles').upsert(newProfile);
+                profile = newProfile as any;
             }
+
+            const registrations = await getRegisteredEventIds(uid).catch(() => []);
+
             set({
                 session,
                 authUser: session.user,
                 profile,
                 interests: (profile?.interests ?? []) as Interest[],
+                registeredEvents: registrations,
                 isLoggedIn: true,
             });
         }
 
         // listen for auth state changes
         supabase.auth.onAuthStateChange(async (event, session) => {
-            console.log('[Store Debug] onAuthStateChange event:', event);
-            if (get().isDemo) {
-                console.log('[Store Debug] isDemo is true, ignoring auth change');
-                return;
-            }
+            if (get().isDemo) return;
             if (session?.user) {
-                const profile = await getProfile(session.user.id).catch(() => null);
+                const uid = session.user.id;
+                const [profile, registrations] = await Promise.all([
+                    getProfile(uid).catch(() => null),
+                    getRegisteredEventIds(uid).catch(() => [])
+                ]);
                 set({
                     session,
                     authUser: session.user,
                     profile,
                     interests: (profile?.interests ?? []) as Interest[],
+                    registeredEvents: registrations,
                     isLoggedIn: true,
                 });
             } else if (event === 'SIGNED_OUT') {
-                set({ session: null, authUser: null, profile: null, isLoggedIn: false });
+                set({ session: null, authUser: null, profile: null, isLoggedIn: false, registeredEvents: [], followedClubs: [] });
             }
         });
 
-        console.log('[Store Debug] initialize finishing, setting isLoading to false');
         set({ isLoading: false });
     },
 
@@ -165,31 +174,32 @@ export const useUserStore = create<UserStore>((set, get) => ({
     },
 
     demoLogin: async () => {
-        console.log('[Store Debug] demoLogin triggered');
         set({ isLoading: true });
         const demoId = '11111111-1111-1111-1111-111111111111';
         
         let profile = await getProfile(demoId).catch(() => null);
         
         if (!profile) {
-            console.log('[Store Debug] DB fetch failed, using high-performance mock profile');
-            profile = {
+            const demoProfile = {
                 id: demoId,
                 name: 'Yugank Rathore',
                 college: 'MIT Manipal',
                 branch: 'CSE',
                 year: 3,
                 avatar_url: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200&h=200&fit=crop',
-                interests: ['tech', 'music', 'food']
-            } as any;
-        } else {
-            console.log('[Store Debug] Demo profile fetched from DB successfully');
+                updated_at: new Date().toISOString(),
+            };
+            await supabase.from('profiles').upsert(demoProfile);
+            profile = demoProfile as any;
         }
+
+        const registrations = await getRegisteredEventIds(demoId).catch(() => []);
 
         set({
             authUser: { id: demoId, email: 'yugaank@gmail.com' } as any,
             profile,
             interests: (profile?.interests ?? []) as Interest[],
+            registeredEvents: registrations,
             isLoggedIn: true,
             isDemo: true,
             isLoading: false

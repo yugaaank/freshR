@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import React from 'react';
+import React, { useState } from 'react';
 import {
     ActivityIndicator,
     ScrollView,
@@ -10,6 +10,7 @@ import {
     View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import * as Haptics from 'expo-haptics';
 import Card from '../src/components/ui/Card';
 import SectionHeader from '../src/components/ui/SectionHeader';
 import StreakGrid from '../src/components/ui/StreakGrid';
@@ -39,6 +40,23 @@ export default function CodingChallengeScreen() {
 
     const isLoading = dayLoading || pastLoading;
 
+    // Fallback mock for hackathon demo if DB is empty
+    const mockChallenge: Challenge = {
+        id: 'mock-1',
+        title: 'Time Complexity Analysis',
+        difficulty: 'Medium',
+        tags: ['Big O', 'Algorithms'],
+        description: 'What is the time complexity of the Merge Sort algorithm in the worst case?',
+        examples: [],
+        constraints: [],
+        acceptance_rate: 85,
+        total_submissions: 1240,
+        date: new Date().toISOString().split('T')[0],
+        created_at: new Date().toISOString()
+    };
+
+    const activeChallenge = todayChallenge || mockChallenge;
+
     if (isLoading) {
         return (
             <SafeAreaView style={styles.safe} edges={['top']}>
@@ -56,7 +74,7 @@ export default function CodingChallengeScreen() {
                     <TouchableOpacity onPress={() => router.back()} activeOpacity={0.88}>
                         <Ionicons name="arrow-back" size={22} color={Colors.text} />
                     </TouchableOpacity>
-                    <Text style={styles.headerTitle}>Daily Challenge 💻</Text>
+                    <Text style={styles.headerTitle}>Daily Quiz 🧠</Text>
                     <View style={{ width: 22 }} />
                 </View>
 
@@ -74,14 +92,14 @@ export default function CodingChallengeScreen() {
                     ))}
                 </View>
 
-                {todayChallenge ? (
+                {activeChallenge ? (
                     <>
-                        <SectionHeader title="Today's Problem" subtitle={todayChallenge.date} style={{ marginTop: Spacing.xl }} />
-                        <ChallengeCard challenge={todayChallenge} />
+                        <SectionHeader title="Today's Question" subtitle={activeChallenge.date} style={{ marginTop: Spacing.xl }} />
+                        <ChallengeCard challenge={activeChallenge} />
                     </>
                 ) : (
                     <View style={styles.noProblem}>
-                        <Text style={styles.noProblemText}>No challenge for today yet 🏖️</Text>
+                        <Text style={styles.noProblemText}>No quiz for today yet 🏖️</Text>
                     </View>
                 )}
 
@@ -130,7 +148,52 @@ export default function CodingChallengeScreen() {
 }
 
 function ChallengeCard({ challenge }: { challenge: Challenge }) {
-    const examples = (challenge.examples as any[]) ?? [];
+    const [selectedOption, setSelectedOption] = useState<string | null>(null);
+    const [isSubmitted, setIsSubmitted] = useState(false);
+
+    // Mock options for the demo (ideally fetched from DB)
+    const options = [
+        { id: 'A', text: 'O(n log n)' },
+        { id: 'B', text: 'O(n)' },
+        { id: 'C', text: 'O(log n)' },
+        { id: 'D', text: 'O(1)' },
+    ];
+    const correctOptionId = 'B';
+
+    const handleSelect = (id: string) => {
+        if (isSubmitted) return;
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        setSelectedOption(id);
+    };
+
+    const handleSubmit = () => {
+        if (!selectedOption) return;
+        setIsSubmitted(true);
+        if (selectedOption === correctOptionId) {
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        } else {
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        }
+    };
+
+    const getOptionStyle = (id: string) => {
+        if (!isSubmitted) {
+            return selectedOption === id ? styles.optionSelected : styles.optionDefault;
+        }
+        if (id === correctOptionId) return styles.optionCorrect;
+        if (id === selectedOption) return styles.optionWrong;
+        return styles.optionDefault;
+    };
+
+    const getTextStyle = (id: string) => {
+        if (!isSubmitted) {
+             return selectedOption === id ? styles.optionTextSelected : styles.optionTextDefault;
+        }
+        if (id === correctOptionId) return styles.optionTextCorrect;
+        if (id === selectedOption) return styles.optionTextWrong;
+        return styles.optionTextDefault;
+    };
+
     return (
         <Card style={styles.problemCard}>
             <View style={styles.problemTop}>
@@ -147,26 +210,49 @@ function ChallengeCard({ challenge }: { challenge: Challenge }) {
                     </Text>
                 </View>
             </View>
+            
             <View style={styles.tagsRow}>
                 {(challenge.tags ?? []).map((t: string) => <TagPill key={t} label={t} variant="purple" size="sm" />)}
             </View>
+            
             <Text style={styles.description}>{challenge.description}</Text>
-            {examples.map((ex, i) => (
-                <View key={i} style={styles.codeBox}>
-                    <Text style={styles.codeBoxTitle}>Example {i + 1}</Text>
-                    <Text style={styles.codeLine}><Text style={styles.codeKey}>Input:  </Text><Text style={styles.code}>{ex.input}</Text></Text>
-                    <Text style={styles.codeLine}><Text style={styles.codeKey}>Output: </Text><Text style={styles.code}>{ex.output}</Text></Text>
-                    {ex.explanation && <Text style={styles.codeExplain}>{ex.explanation}</Text>}
-                </View>
-            ))}
+
+            <View style={styles.optionsContainer}>
+                {options.map((opt) => (
+                    <TouchableOpacity
+                        key={opt.id}
+                        style={[styles.optionBase, getOptionStyle(opt.id)]}
+                        onPress={() => handleSelect(opt.id)}
+                        activeOpacity={0.9}
+                    >
+                        <Text style={[styles.optionLabel, getTextStyle(opt.id)]}>{opt.id}.</Text>
+                        <Text style={[styles.optionText, getTextStyle(opt.id)]}>{opt.text}</Text>
+                        {isSubmitted && opt.id === correctOptionId && (
+                            <Ionicons name="checkmark-circle" size={20} color="#15803d" style={{ marginLeft: 'auto' }} />
+                        )}
+                        {isSubmitted && opt.id === selectedOption && opt.id !== correctOptionId && (
+                            <Ionicons name="close-circle" size={20} color="#b91c1c" style={{ marginLeft: 'auto' }} />
+                        )}
+                    </TouchableOpacity>
+                ))}
+            </View>
+
+            <TouchableOpacity 
+                style={[styles.solveBtn, (!selectedOption || isSubmitted) && styles.solveBtnDisabled]} 
+                onPress={handleSubmit}
+                disabled={!selectedOption || isSubmitted}
+                activeOpacity={0.88}
+            >
+                <Text style={styles.solveBtnText}>
+                    {isSubmitted ? (selectedOption === correctOptionId ? 'Correct! 🎉' : 'Incorrect 😞') : 'Submit Answer'}
+                </Text>
+            </TouchableOpacity>
+
             <View style={styles.statsRow}>
                 <Text style={styles.stat}>Acceptance: {challenge.acceptance_rate}%</Text>
                 <View style={styles.statDot} />
                 <Text style={styles.stat}>{challenge.total_submissions.toLocaleString()} submissions</Text>
             </View>
-            <TouchableOpacity style={styles.solveBtn} activeOpacity={0.88}>
-                <Text style={styles.solveBtnText}>Open in Editor →</Text>
-            </TouchableOpacity>
         </Card>
     );
 }
@@ -191,16 +277,10 @@ const styles = StyleSheet.create({
     diffText: { ...Typography.micro, fontWeight: '700' as const, fontSize: 11 },
     tagsRow: { flexDirection: 'row', gap: Spacing.xs, flexWrap: 'wrap' },
     description: { ...Typography.body2, color: Colors.textSecondary, lineHeight: 20 },
-    codeBox: { backgroundColor: '#F8F8FC', borderRadius: Radius.lg, padding: Spacing.md, gap: 4, borderLeftWidth: 3, borderLeftColor: Colors.accent },
-    codeBoxTitle: { ...Typography.micro, color: Colors.accent, letterSpacing: 1, marginBottom: 2 },
-    codeLine: { flexDirection: 'row', flexWrap: 'wrap' },
-    codeKey: { ...Typography.mono, color: Colors.textSecondary, fontSize: 12 },
-    code: { ...Typography.mono, color: Colors.text, fontSize: 12 },
-    codeExplain: { ...Typography.caption, color: Colors.textSecondary, marginTop: 3 },
     statsRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
     stat: { ...Typography.caption, color: Colors.textSecondary },
     statDot: { width: 3, height: 3, borderRadius: 2, backgroundColor: Colors.textTertiary },
-    solveBtn: { backgroundColor: Colors.accent, borderRadius: Radius.pill, paddingVertical: Spacing.md, alignItems: 'center' },
+    solveBtn: { backgroundColor: Colors.primary, borderRadius: Radius.pill, paddingVertical: Spacing.md, alignItems: 'center' },
     solveBtnText: { ...Typography.h5, color: '#FFF', fontWeight: '700' as const },
     streakCard: { marginHorizontal: Spacing.section, borderWidth: 0.5, borderColor: Colors.divider },
     legendRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: Spacing.sm },
@@ -214,4 +294,25 @@ const styles = StyleSheet.create({
     pastTagsRow: { flexDirection: 'row', gap: Spacing.xs, flexWrap: 'wrap' },
     pastDiff: { paddingHorizontal: Spacing.sm, paddingVertical: 3, borderRadius: Radius.pill, marginLeft: Spacing.sm },
     pastDiffText: { ...Typography.micro, fontWeight: '700' as const, fontSize: 11 },
+    solveBtnDisabled: { opacity: 0.6, backgroundColor: Colors.mutedForeground },
+    optionsContainer: { gap: Spacing.sm, marginTop: Spacing.sm },
+    optionBase: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: Spacing.md,
+        borderRadius: Radius.lg,
+        borderWidth: 1,
+        borderColor: Colors.divider,
+        backgroundColor: Colors.surface,
+    },
+    optionDefault: { borderColor: Colors.divider },
+    optionSelected: { borderColor: Colors.primary, backgroundColor: Colors.primary + '10' },
+    optionCorrect: { borderColor: '#15803d', backgroundColor: '#15803d15' },
+    optionWrong: { borderColor: '#b91c1c', backgroundColor: '#b91c1c15' },
+    optionLabel: { ...Typography.h5, marginRight: Spacing.sm, fontFamily: 'Sora_700Bold' },
+    optionText: { ...Typography.body2, flex: 1 },
+    optionTextDefault: { color: Colors.text },
+    optionTextSelected: { color: Colors.primary, fontFamily: 'Sora_700Bold' },
+    optionTextCorrect: { color: '#15803d', fontFamily: 'Sora_600SemiBold' },
+    optionTextWrong: { color: '#b91c1c' },
 });

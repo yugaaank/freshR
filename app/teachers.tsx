@@ -154,14 +154,11 @@ export default function TeacherDashboard() {
                                         <Text style={[styles.emailBtnText, { color: Colors.foreground }]}>Email</Text>
                                     </TouchableOpacity>
                                     <TouchableOpacity 
-                                        style={[styles.mapLinkBtn, { borderColor: Colors.border }]}
+                                        style={[styles.mapLinkBtn, { backgroundColor: Colors.primary }]}
                                         onPress={() => router.push({ pathname: '/campus-map', params: { highlight: teacher.department.toLowerCase().includes('cs') ? 'l7' : 'l1' } })}
                                     >
-                                        <Ionicons name="map-outline" size={14} color={Colors.primary} />
-                                        <Text style={[styles.mapLinkBtnText, { color: Colors.foreground }]}>Locate</Text>
-                                    </TouchableOpacity>
-                                    <TouchableOpacity style={[styles.reviewBtn, { backgroundColor: Colors.primary }]}>
-                                        <Text style={styles.reviewBtnText}>Review</Text>
+                                        <Ionicons name="map-outline" size={14} color="#FFF" />
+                                        <Text style={styles.mapLinkBtnText}>Locate</Text>
                                     </TouchableOpacity>
                                 </View>
                             </Card>
@@ -223,15 +220,9 @@ const styles = StyleSheet.create({
     emailBtnText: { ...Typography.micro, fontFamily: 'Sora_600SemiBold' },
     mapLinkBtn: {
         flex: 1, flexDirection: 'row', alignItems: 'center', gap: 5,
-        borderWidth: 0.5, 
         borderRadius: Radius.md, paddingVertical: Spacing.sm, justifyContent: 'center',
     },
-    mapLinkBtnText: { ...Typography.micro, fontFamily: 'Sora_600SemiBold' },
-    reviewBtn: {
-        flex: 1,
-        borderRadius: Radius.md, paddingVertical: Spacing.sm, alignItems: 'center', justifyContent: 'center'
-    },
-    reviewBtnText: { ...Typography.micro, color: '#FFF', fontFamily: 'Sora_700Bold' },
+    mapLinkBtnText: { ...Typography.micro, color: '#FFF', fontFamily: 'Sora_700Bold' },
     empty: { alignItems: 'center', paddingTop: 60 },
     emptyText: { ...Typography.body1, color: Colors.textSecondary },
 });

@@ -345,6 +345,50 @@ export interface Database {
                 Relationships: [];
             };
 
+            user_calendar_events: {
+                Row: {
+                    id: string; user_id: string; title: string; date: string; time: string | null;
+                    location: string | null; category: string; priority: string; notes: string | null;
+                    is_all_day: boolean; recurring: string | null; attachments: Json; tags: string[];
+                    estimated_effort: number; progress: number; subtasks: Json; due_date: string | null;
+                    difficulty: number; created_at: string; updated_at: string;
+                };
+                Insert: {
+                    id?: string; user_id: string; title: string; date: string; time?: string | null;
+                    location?: string | null; category?: string; priority?: string; notes?: string | null;
+                    is_all_day?: boolean; recurring?: string | null; attachments?: Json; tags?: string[];
+                    estimated_effort?: number; progress?: number; subtasks?: Json; due_date?: string | null;
+                    difficulty?: number;
+                };
+                Update: {
+                    title?: string; date?: string; time?: string | null; location?: string | null;
+                    category?: string; priority?: string; notes?: string | null; is_all_day?: boolean;
+                    recurring?: string | null; attachments?: Json; tags?: string[];
+                    estimated_effort?: number; progress?: number; subtasks?: Json; due_date?: string | null;
+                    difficulty?: number; updated_at?: string;
+                };
+                Relationships: [];
+            };
+
+            user_productivity: {
+                Row: {
+                    user_id: string; weekly_score: number; procrastination_index: number;
+                    completion_rate: number; total_study_hours: number; peak_hours: Json;
+                    workload_heatmap: Json; updated_at: string;
+                };
+                Insert: {
+                    user_id: string; weekly_score?: number; procrastination_index?: number;
+                    completion_rate?: number; total_study_hours?: number; peak_hours?: Json;
+                    workload_heatmap?: Json;
+                };
+                Update: {
+                    weekly_score?: number; procrastination_index?: number;
+                    completion_rate?: number; total_study_hours?: number; peak_hours?: Json;
+                    workload_heatmap?: Json; updated_at?: string;
+                };
+                Relationships: [];
+            };
+
             push_notification_tokens: {
                 Row: { id: string; user_id: string; token: string; platform: string; created_at: string };
                 Insert: { user_id: string; token: string; platform: string };

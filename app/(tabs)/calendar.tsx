@@ -15,7 +15,9 @@ import {
     Alert,
     Platform,
     ActivityIndicator,
+    Switch,
 } from 'react-native';
+import * as Haptics from 'expo-haptics';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Colors, Radius, Spacing, Typography } from '../../src/theme';
@@ -23,8 +25,14 @@ import { useCalendarStore } from '../../src/store/calendarStore';
 import { useAssignments } from '../../src/hooks/useAcademics';
 import { useUserStore } from '../../src/store/userStore';
 import { useEvents } from '../../src/hooks/useEvents';
+import { 
+    usePersonalEvents, 
+    useCreateCalendarEvent, 
+    useDeleteCalendarEvent 
+} from '../../src/hooks/useCalendar';
 import TagPill from '../../src/components/ui/TagPill';
 import SearchBar from '../../src/components/ui/SearchBar';
+import Card from '../../src/components/ui/Card';
 
 const TODAY = dayjs();
 const DATE_FORMAT = 'YYYY-MM-DD';
@@ -49,104 +57,54 @@ export default function CalendarScreen() {
     const [viewMode, setViewMode] = useState<'today' | 'all'>('today');
     const [isModalVisible, setModalVisible] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
+    const [priorityFilter, setPriorityFilter] = useState<'All' | 'High' | 'Medium' | 'Low'>('All');
+    const [currentWeekStart, setCurrentWeekStart] = useState(TODAY.startOf('week'));
+    const [currentMonth, setCurrentMonth] = useState(TODAY.startOf('month'));
 
-    const { customEvents, addEvent, removeEvent, hiddenAcademicIds, hideAcademicEvent } = useCalendarStore();
+    const { hiddenAcademicIds, hideAcademicEvent } = useCalendarStore();
     const { profile, registeredEvents, unregisterEvent } = useUserStore();
     
-    const { data: assignments = [], isLoading: assignmentsLoading } = useAssignments(profile?.id ?? null);
+    const userId = profile?.id ?? '11111111-1111-1111-1111-111111111111';
+    
+    // DB Source of Truth via Hooks
+    const { data: assignments = [], isLoading: assignmentsLoading } = useAssignments(userId);
     const { data: campusEvents = [], isLoading: eventsLoading } = useEvents();
+    const { data: personalEvents = [], isLoading: personalLoading } = usePersonalEvents(userId);
+    
+    const createEventMutation = useCreateCalendarEvent(userId);
+    const deleteEventMutation = useDeleteCalendarEvent(userId);
 
-    const isLoading = (assignmentsLoading || eventsLoading) && viewMode === 'today';
-
-    const [newTitle, setNewTitle] = useState('');
-    const [newCategory, setNewCategory] = useState<'Assignment' | 'Deadline' | 'Personal' | 'Study'>('Personal');
-    const [eventDate, setEventDate] = useState(new Date());
-    const [eventTime, setEventTime] = useState(new Date());
-    const [showDatePicker, setShowDatePicker] = useState(false);
-    const [showTimePicker, setShowTimePicker] = useState(false);
-
-    useEffect(() => {
-        setEventDate(dayjs(selectedDate).toDate());
-    }, [selectedDate]);
-
-    useEffect(() => {
-        const userId = profile?.id ?? '11111111-1111-1111-1111-111111111111';
-        useCalendarStore.getState().fetchEvents(userId);
-    }, [profile]);
-
-    const allEvents = useMemo(() => {
-        const clubEvents = campusEvents
-            .filter((e: any) => registeredEvents.includes(e.id))
-            .map((e: any) => ({ 
-                ...e, 
-                type: 'club',
-                location: e.venue || e.location
-            }));
-            
-        const userEvents = customEvents.map(e => ({ ...e, type: 'custom' }));
-        
-        const academicEvents = assignments
-            .filter(a => !hiddenAcademicIds.includes(a.id))
-            .map(a => ({
-                id: a.id,
-                title: `Deadline: ${a.title}`,
-                date: a.due_date,
-                time: '11:59 PM',
-                location: a.subject_name,
-                category: 'Assignment',
-                type: 'academic'
-            }));
-
-        return [...clubEvents, ...userEvents, ...academicEvents];
-    }, [customEvents, assignments, registeredEvents, campusEvents, hiddenAcademicIds]);
-
-    const filteredEvents = useMemo(() => {
-        if (!searchQuery.trim()) return allEvents;
-        const q = searchQuery.toLowerCase();
-        return allEvents.filter(e => 
-            e.title.toLowerCase().includes(q) || 
-            e.location?.toLowerCase().includes(q) ||
-            e.category?.toLowerCase().includes(q)
-        );
-    }, [allEvents, searchQuery]);
-
-    const eventsByDate = useMemo(() => {
-        return filteredEvents.reduce<Record<string, any[]>>((map, event) => {
-            map[event.date] = map[event.date] ?? [];
-            map[event.date].push(event);
-            return map;
-        }, {});
-    }, [filteredEvents]);
-
-    const weekDays = useMemo(() => buildWeekDays(TODAY), []);
-    const todayEvents = eventsByDate[selectedDate] ?? [];
-
-    const sections = useMemo(
-        () =>
-            Object.entries(eventsByDate)
-                .sort(([a], [b]) => (a > b ? 1 : -1))
-                .map(([date, items]) => ({
-                    title: dayjs(date).format('ddd, MMM D'),
-                    data: items,
-                })),
-        [eventsByDate]
-    );
-
-    const handleAddEvent = () => {
-        if (!newTitle.trim()) {
-            Alert.alert('Error', 'Please enter a title');
-            return;
+    const calendarDays = useMemo(() => {
+        const start = currentMonth.startOf('month').startOf('week');
+        const end = currentMonth.endOf('month').endOf('week');
+        const days = [];
+        let curr = start;
+        while (curr.isBefore(end) || curr.isSame(end, 'day')) {
+            days.push(curr);
+            curr = curr.add(1, 'day');
         }
-        addEvent({
-            title: newTitle,
-            date: dayjs(eventDate).format(DATE_FORMAT),
-            time: dayjs(eventTime).format('hh:mm A'),
-            location: 'Personal',
-            category: newCategory,
-        }, profile?.id ?? '11111111-1111-1111-1111-111111111111');
-        setNewTitle('');
-        setModalVisible(false);
+        return days;
+    }, [currentMonth]);
+
+    const changeMonth = (offset: number) => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        setCurrentMonth(prev => prev.add(offset, 'month'));
     };
+
+    const weekDays = useMemo(() => buildWeekDays(currentWeekStart), [currentWeekStart]);
+
+    const changeWeek = (offset: number) => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        setCurrentWeekStart(prev => prev.add(offset, 'week'));
+    };
+
+    const resetToToday = () => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        setCurrentWeekStart(TODAY.startOf('week'));
+        setSelectedDate(TODAY.format(DATE_FORMAT));
+    };
+
+    const isLoading = (assignmentsLoading || eventsLoading || personalLoading) && viewMode === 'today';
 
     const handleRemoveItem = (item: any) => {
         const actionLabel = item.type === 'club' ? 'Unregister' : item.type === 'academic' ? 'Hide' : 'Delete';
@@ -156,13 +114,80 @@ export default function CalendarScreen() {
             { 
                 text: actionLabel, 
                 style: 'destructive', 
-                onPress: () => {
-                    if (item.type === 'custom') removeEvent(item.id);
+                onPress: async () => {
+                    if (item.type === 'custom') await deleteEventMutation.mutateAsync(item.id);
                     else if (item.type === 'club') unregisterEvent(item.id);
                     else if (item.type === 'academic') hideAcademicEvent(item.id);
                 } 
             }
         ]);
+    };
+
+    const handleEditItem = (item: any) => {
+        // Entry point for edit - for now just alert
+        Alert.alert('Edit Feature', `Editing logic for "${item.title}" is being integrated.`);
+    };
+
+    const [newTitle, setNewTitle] = useState('');
+    const [newCategory, setNewCategory] = useState('Personal');
+    const [newPriority, setNewPriority] = useState('Medium');
+    const [newNotes, setNewNotes] = useState('');
+    const [isAllDay, setIsAllDay] = useState(false);
+    const [estimatedEffort, setEstimatedEffort] = useState('1');
+    const [eventDate, setEventDate] = useState(new Date());
+    const [eventTime, setEventTime] = useState(new Date());
+    const [showDatePicker, setShowDatePicker] = useState(false);
+    const [showTimePicker, setShowTimePicker] = useState(false);
+
+    useEffect(() => {
+        setEventDate(dayjs(selectedDate).toDate());
+    }, [selectedDate]);
+
+    const getCategoryColor = (category: string) => {
+        switch (category?.toLowerCase()) {
+            case 'exam': return '#EF4444';
+            case 'deadline': return '#F59E0B';
+            case 'event': return '#3B82F6';
+            case 'assignment': return '#8B5CF6';
+            case 'study': return '#10B981';
+            default: return Colors.primary;
+        }
+    };
+
+    const handleAddEvent = async () => {
+        if (!newTitle.trim()) {
+            Alert.alert('Error', 'Please enter a title');
+            return;
+        }
+        
+        try {
+            await createEventMutation.mutateAsync({
+                title: newTitle,
+                date: dayjs(eventDate).format(DATE_FORMAT),
+                time: isAllDay ? null : dayjs(eventTime).format('hh:mm A'),
+                location: 'Campus',
+                category: newCategory,
+                priority: newPriority,
+                notes: newNotes,
+                is_all_day: isAllDay,
+                estimated_effort: parseInt(estimatedEffort) || 1,
+                progress: 0,
+                difficulty: 3,
+                attachments: [],
+                tags: [],
+                subtasks: [],
+                recurring: null,
+                due_date: null,
+            });
+            
+            setNewTitle('');
+            setNewNotes('');
+            setModalVisible(false);
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        } catch (err: any) {
+            console.error('[Calendar Debug] Save failed:', err);
+            Alert.alert('Error', `Failed to save event: ${err.message || 'Unknown error'}`);
+        }
     };
 
     const onDateChange = (_: any, selected: Date | undefined) => {
@@ -175,10 +200,94 @@ export default function CalendarScreen() {
         if (selected) setEventTime(selected);
     };
 
-    const totalEventsToday = eventsByDate[TODAY.format(DATE_FORMAT)]?.length ?? 0;
+    const allEvents = useMemo(() => {
+        // Strict normalization: extract only YYYY-MM-DD from any date input
+        const normalize = (d: any) => d ? dayjs(d).format(DATE_FORMAT) : '';
+
+        const clubEvents = (campusEvents || [])
+            .filter((e: any) => registeredEvents.includes(e.id))
+            .map((e: any) => ({ 
+                ...e, 
+                type: 'club',
+                location: e.venue || e.location,
+                priority: 'High',
+                color: '#3B82F6',
+                date: normalize(e.date)
+            }));
+            
+        const userEvents = (personalEvents || []).map(e => ({ 
+            ...e, 
+            type: 'custom',
+            color: getCategoryColor(e.category),
+            date: normalize(e.date)
+        }));
+        
+        const academicEvents = (assignments || [])
+            .filter(a => !hiddenAcademicIds.includes(a.id))
+            .map(a => ({
+                id: a.id,
+                title: `Deadline: ${a.title}`,
+                date: normalize(a.due_date),
+                time: '11:59 PM',
+                location: a.subject_name,
+                category: 'Assignment',
+                type: 'academic',
+                priority: 'High',
+                color: '#8B5CF6'
+            }));
+
+        return [...clubEvents, ...userEvents, ...academicEvents];
+    }, [personalEvents, assignments, registeredEvents, campusEvents, hiddenAcademicIds]);
+
+    const filteredEvents = useMemo(() => {
+        let all = allEvents;
+        if (searchQuery.trim()) {
+            const q = searchQuery.toLowerCase();
+            all = all.filter(e => 
+                e.title.toLowerCase().includes(q) || 
+                e.location?.toLowerCase().includes(q) ||
+                e.category?.toLowerCase().includes(q)
+            );
+        }
+        if (priorityFilter !== 'All') {
+            all = all.filter(e => e.priority === priorityFilter);
+        }
+        return all;
+    }, [allEvents, searchQuery, priorityFilter]);
+
+    const eventsByDate = useMemo(() => {
+        const map: Record<string, any[]> = {};
+        filteredEvents.forEach(event => {
+            const dateKey = event.date; // already normalized string
+            if (dateKey) {
+                if (!map[dateKey]) map[dateKey] = [];
+                map[dateKey].push(event);
+            }
+        });
+        return map;
+    }, [filteredEvents]);
+
+    // In Full Timeline, sections should show all events.
+    // In Daily View, todayEvents shows only the selected date.
+    const todayEvents = useMemo(() => eventsByDate[selectedDate] ?? [], [eventsByDate, selectedDate]);
+
+    const sections = useMemo(() => {
+        return Object.keys(eventsByDate)
+            .sort()
+            .map(date => ({
+                title: dayjs(date).format('dddd, MMM D').toUpperCase(),
+                data: eventsByDate[date],
+                date
+            }));
+    }, [eventsByDate]);
+
+    const totalEventsToday = useMemo(() => {
+        const todayKey = TODAY.format(DATE_FORMAT);
+        return eventsByDate[todayKey]?.length ?? 0;
+    }, [eventsByDate]);
 
     return (
-        <SafeAreaView style={styles.safe} edges={['top']}>
+        <SafeAreaView style={styles.safe} edges={['top']} key={`calendar-${registeredEvents.length}`}>
             <StatusBar barStyle="light-content" />
             
             <View style={styles.header}>
@@ -215,6 +324,22 @@ export default function CalendarScreen() {
                     />
                 </View>
 
+                <View style={styles.filterRowPriority}>
+                    {(['All', 'High', 'Medium', 'Low'] as const).map((p) => {
+                        const isActive = priorityFilter === p;
+                        const pColor = p === 'High' ? Colors.error : p === 'Medium' ? Colors.warning : p === 'Low' ? Colors.success : Colors.primary;
+                        return (
+                            <TouchableOpacity 
+                                key={p} 
+                                style={[styles.filterChipSmall, isActive && { backgroundColor: pColor, borderColor: pColor }]}
+                                onPress={() => setPriorityFilter(p)}
+                            >
+                                <Text style={[styles.filterChipTextSmall, isActive && { color: '#FFF' }]}>{p}</Text>
+                            </TouchableOpacity>
+                        );
+                    })}
+                </View>
+
                 <View style={styles.viewToggleRow}>
                     {['today', 'all'].map((mode) => (
                         <TouchableOpacity
@@ -229,7 +354,7 @@ export default function CalendarScreen() {
                             }}
                         >
                             <Text style={[styles.viewToggleText, viewMode === mode && styles.viewToggleTextActive]}>
-                                {mode === 'today' ? 'Daily View' : 'Full Timeline'}
+                                {mode === 'today' ? 'Weekly View' : 'Schedule List'}
                             </Text>
                         </TouchableOpacity>
                     ))}
@@ -242,21 +367,58 @@ export default function CalendarScreen() {
                 ) : viewMode === 'today' ? (
                     <View>
                         <View style={styles.weekRowWrap}>
-                            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.weekScrollContent}>
+                            <View style={styles.weekNavHeader}>
+                                <TouchableOpacity onPress={() => changeWeek(-1)} style={styles.weekNavBtn}>
+                                    <Ionicons name="chevron-back" size={18} color={Colors.text} />
+                                </TouchableOpacity>
+                                <View style={styles.weekInfo}>
+                                    <Text style={styles.weekMonthText}>
+                                        {currentWeekStart.format('MMMM YYYY')}
+                                    </Text>
+                                    {!currentWeekStart.isSame(TODAY, 'week') && (
+                                        <TouchableOpacity onPress={resetToToday} style={styles.todayLabelBtn}>
+                                            <Text style={styles.todayLabelText}>TODAY</Text>
+                                        </TouchableOpacity>
+                                    )}
+                                </View>
+                                <TouchableOpacity onPress={() => changeWeek(1)} style={styles.weekNavBtn}>
+                                    <Ionicons name="chevron-forward" size={18} color={Colors.text} />
+                                </TouchableOpacity>
+                            </View>
+                            <View style={styles.weekStripContainer}>
                                 {weekDays.map((day) => {
-                                    const isActive = selectedDate === day.dateStr;
+                                    const dateStr = day.dateStr;
+                                    const isActive = selectedDate === dateStr;
+                                    const dayEvents = eventsByDate[dateStr] ?? [];
+                                    const hasEvents = dayEvents.length > 0;
+
+                                    // Determine highest priority for the day
+                                    let maxPriority = 'Low';
+                                    if (dayEvents.some(e => e.priority === 'High')) maxPriority = 'High';
+                                    else if (dayEvents.some(e => e.priority === 'Medium')) maxPriority = 'Medium';
+
+                                    let priorityColor = Colors.success;
+                                    if (maxPriority === 'High') priorityColor = Colors.error;
+                                    else if (maxPriority === 'Medium') priorityColor = Colors.warning;
+
                                     return (
                                         <TouchableOpacity
-                                            key={day.dateStr}
+                                            key={dateStr}
                                             style={[styles.weekDay, isActive && styles.weekDayActive]}
-                                            onPress={() => setSelectedDate(day.dateStr)}
+                                            onPress={() => setSelectedDate(dateStr)}
                                         >
                                             <Text style={[styles.weekDayLabel, isActive && styles.weekDayTextActive]}>{day.label}</Text>
                                             <Text style={[styles.weekDayDate, isActive && styles.weekDayTextActive]}>{day.day.date()}</Text>
+                                            {hasEvents && (
+                                                <View style={[
+                                                    styles.weekEventDot, 
+                                                    { backgroundColor: isActive ? '#FFF' : priorityColor }
+                                                ]} />
+                                            )}
                                         </TouchableOpacity>
                                     );
                                 })}
-                            </ScrollView>
+                            </View>
                         </View>
 
                         <View style={styles.sectionHeaderWrap}>
@@ -269,12 +431,15 @@ export default function CalendarScreen() {
                                     <TouchableOpacity 
                                         key={event.id} 
                                         style={styles.eventCardWrap}
-                                        onPress={() => event.type === 'club' && router.push(`/event/${event.id}` as any)}
+                                        onPress={() => event.type === 'club' ? router.push(`/event/${event.id}` as any) : null}
                                     >
-                                        <View style={[styles.eventCard, { backgroundColor: Colors.card, borderColor: Colors.border }]}>
+                                        <View style={[styles.eventCard, { backgroundColor: Colors.card, borderLeftWidth: 4, borderLeftColor: event.color || Colors.primary, borderColor: Colors.border }]}>
                                             <View style={styles.eventCardHeader}>
-                                                <Text style={[styles.eventCardTime, { color: Colors.mutedForeground }]}>{event.time}</Text>
-                                                <TagPill label={event.type.toUpperCase()} variant="grey" size="sm" />
+                                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                                    <View style={[styles.priorityDot, { backgroundColor: event.priority === 'High' ? Colors.error : event.priority === 'Medium' ? Colors.warning : Colors.success }]} />
+                                                    <Text style={[styles.eventCardTime, { color: Colors.mutedForeground }]}>{event.time || 'All Day'}</Text>
+                                                </View>
+                                                <TagPill label={event.category?.toUpperCase() || event.type.toUpperCase()} variant="grey" size="sm" />
                                             </View>
                                             <Text style={[styles.eventCardTitle, { color: Colors.foreground }]} numberOfLines={2}>{event.title}</Text>
                                             <View style={styles.eventCardFooter}>
@@ -300,24 +465,54 @@ export default function CalendarScreen() {
                                 return (
                                     <TouchableOpacity 
                                         key={`list-${event.id}`} 
-                                        style={styles.agendaItem}
+                                        style={[styles.agendaItem, { borderLeftWidth: 4, borderLeftColor: event.color || Colors.primary }]}
                                         onPress={() => event.type === 'club' && router.push(`/event/${event.id}` as any)}
                                         onLongPress={() => handleRemoveItem(event)}
                                     >
                                         <View style={[styles.agendaIconWrap, { backgroundColor: Colors.secondary }]}>
-                                            <Ionicons name={event.type === 'academic' ? "school" : "calendar"} size={18} color={Colors.primary} />
+                                            <Ionicons name={event.type === 'academic' ? "school" : event.category === 'Exam' ? "document-text" : "calendar"} size={18} color={event.color || Colors.primary} />
                                         </View>
                                         <View style={{ flex: 1 }}>
-                                            <Text style={styles.agendaItemTitle}>{event.title}</Text>
-                                            <Text style={styles.agendaItemMeta}>{event.time} · {event.location}</Text>
+                                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                                <View style={[styles.priorityDot, { backgroundColor: event.priority === 'High' ? Colors.error : event.priority === 'Medium' ? Colors.warning : Colors.success }]} />
+                                                <Text style={styles.agendaItemTitle}>{event.title}</Text>
+                                            </View>
+                                            <Text style={styles.agendaItemMeta}>{event.time || 'All Day'} · {event.location}</Text>
+                                            
+                                            {event.subtasks && event.subtasks.length > 0 && (
+                                                <View style={styles.subtasksList}>
+                                                    {event.subtasks.map((st: any, idx: number) => (
+                                                        <View key={st.id || idx} style={styles.subtaskItem}>
+                                                            <Ionicons 
+                                                                name={st.completed ? "checkbox" : "square-outline"} 
+                                                                size={14} 
+                                                                color={st.completed ? Colors.success : Colors.mutedForeground} 
+                                                            />
+                                                            <Text style={[styles.subtaskText, st.completed && styles.subtaskTextDone]}>{st.title}</Text>
+                                                        </View>
+                                                    ))}
+                                                </View>
+                                            )}
+
+                                            <View style={styles.itemActionRow}>
+                                                {event.type === 'custom' && (
+                                                    <TouchableOpacity onPress={() => handleEditItem(event)} style={styles.itemActionBtn}>
+                                                        <Ionicons name="pencil" size={14} color={Colors.primary} />
+                                                        <Text style={styles.itemActionText}>Edit</Text>
+                                                    </TouchableOpacity>
+                                                )}
+                                                <TouchableOpacity onPress={() => handleRemoveItem(event)} style={[styles.itemActionBtn, { backgroundColor: Colors.errorLight }]}>
+                                                    <Ionicons 
+                                                        name={event.type === 'academic' ? "eye-off" : "trash"} 
+                                                        size={14} 
+                                                        color={Colors.error} 
+                                                    />
+                                                    <Text style={[styles.itemActionText, { color: Colors.error }]}>
+                                                        {event.type === 'club' ? 'Unregister' : event.type === 'academic' ? 'Hide' : 'Delete'}
+                                                    </Text>
+                                                </TouchableOpacity>
+                                            </View>
                                         </View>
-                                        <TouchableOpacity onPress={() => handleRemoveItem(event)}>
-                                            <Ionicons 
-                                                name={event.type === 'academic' ? "eye-off-outline" : "trash-outline"} 
-                                                size={16} 
-                                                color={Colors.mutedForeground} 
-                                            />
-                                        </TouchableOpacity>
                                     </TouchableOpacity>
                                 );
                             })}
@@ -330,38 +525,127 @@ export default function CalendarScreen() {
                     </View>
                 ) : (
                     <View style={styles.fullTimelineWrap}>
-                        <SectionList
-                            scrollEnabled={false}
-                            sections={sections}
-                            keyExtractor={(item) => item.id}
-                            renderSectionHeader={({ section }) => (
-                                <Text style={styles.sectionHeader}>{section.title}</Text>
-                            )}
-                            renderItem={({ item }) => {
+                        <View style={styles.calendarHeader}>
+                            <TouchableOpacity onPress={() => changeMonth(-1)} style={styles.monthNavBtn}>
+                                <Ionicons name="chevron-back" size={20} color={Colors.text} />
+                            </TouchableOpacity>
+                            <Text style={styles.currentMonthText}>{currentMonth.format('MMMM YYYY')}</Text>
+                            <TouchableOpacity onPress={() => changeMonth(1)} style={styles.monthNavBtn}>
+                                <Ionicons name="chevron-forward" size={20} color={Colors.text} />
+                            </TouchableOpacity>
+                        </View>
+
+                        <View style={styles.calendarGrid}>
+                            {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((day, i) => (
+                                <Text key={i} style={styles.weekdayLabel}>{day}</Text>
+                            ))}
+                            {calendarDays.map((day, i) => {
+                                const dateStr = day.format(DATE_FORMAT);
+                                const isSelected = dateStr === selectedDate;
+                                const isCurrentMonth = day.isSame(currentMonth, 'month');
+                                const dayEvents = eventsByDate[dateStr] ?? [];
+                                const hasEvents = dayEvents.length > 0;
+                                
+                                // Determine highest priority for the day
+                                let maxPriority = 'Low';
+                                if (dayEvents.some(e => e.priority === 'High')) maxPriority = 'High';
+                                else if (dayEvents.some(e => e.priority === 'Medium')) maxPriority = 'Medium';
+
+                                let priorityColor = Colors.success;
+                                if (maxPriority === 'High') priorityColor = Colors.error;
+                                else if (maxPriority === 'Medium') priorityColor = Colors.warning;
+
                                 return (
                                     <TouchableOpacity
-                                        style={styles.timelineItem}
-                                        activeOpacity={0.85}
-                                        onPress={() => item.type === 'club' && router.push(`/event/${item.id}` as any)}
-                                        onLongPress={() => handleRemoveItem(item)}
+                                        key={i}
+                                        style={[
+                                            styles.calendarDay,
+                                            isSelected && styles.calendarDaySelected,
+                                            !isCurrentMonth && styles.calendarDayOutside
+                                        ]}
+                                        onPress={() => {
+                                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                                            setSelectedDate(dateStr);
+                                        }}
                                     >
-                                        <View style={[styles.timelineIconWrap, { backgroundColor: Colors.secondary }]}>
-                                            <Ionicons name="flash" size={16} color={Colors.primary} />
-                                        </View>
-                                        <View style={{ flex: 1 }}>
-                                            <Text style={styles.timelineTitle}>{item.title}</Text>
-                                            <Text style={styles.timelineMeta}>{item.time} · {item.location}</Text>
-                                        </View>
-                                        <TagPill 
-                                            label={item.type.toUpperCase()} 
-                                            variant="grey" 
-                                            size="sm" 
-                                        />
+                                        <Text style={[
+                                            styles.calendarDayText,
+                                            isSelected && styles.calendarDayTextSelected,
+                                            !isCurrentMonth && styles.calendarDayTextOutside
+                                        ]}>
+                                            {day.date()}
+                                        </Text>
+                                        {hasEvents && (
+                                            <View style={[
+                                                styles.eventBadge, 
+                                                { backgroundColor: isSelected ? '#FFF' : priorityColor }
+                                            ]}>
+                                                <Text style={[
+                                                    styles.eventBadgeText, 
+                                                    { color: isSelected ? priorityColor : '#FFF' }
+                                                ]}>
+                                                    {dayEvents.length}
+                                                </Text>
+                                            </View>
+                                        )}
                                     </TouchableOpacity>
                                 );
-                            }}
-                            contentContainerStyle={styles.listContent}
-                        />
+                            })}
+                        </View>
+
+                        <View style={styles.sectionHeaderWrap}>
+                            <Text style={styles.sectionTitle}>Upcoming Schedule</Text>
+                        </View>
+
+                        <View style={styles.agendaList}>
+                            {sections.length > 0 ? sections.map((section) => (
+                                <View key={section.title} style={{ marginBottom: Spacing.md }}>
+                                    <Text style={styles.sectionHeader}>{section.title.toUpperCase()}</Text>
+                                    {section.data.map((event) => (
+                                        <TouchableOpacity 
+                                            key={`list-full-${event.id}`} 
+                                            style={[styles.agendaItem, { borderLeftWidth: 4, borderLeftColor: event.color || Colors.primary, marginBottom: 8 }]}
+                                            onPress={() => event.type === 'club' && router.push(`/event/${event.id}` as any)}
+                                            onLongPress={() => handleRemoveItem(event)}
+                                        >
+                                            <View style={[styles.agendaIconWrap, { backgroundColor: Colors.secondary }]}>
+                                                <Ionicons name={event.type === 'academic' ? "school" : event.category === 'Exam' ? "document-text" : "calendar"} size={18} color={event.color || Colors.primary} />
+                                            </View>
+                                            <View style={{ flex: 1 }}>
+                                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                                    <View style={[styles.priorityDot, { backgroundColor: event.priority === 'High' ? Colors.error : event.priority === 'Medium' ? Colors.warning : Colors.success }]} />
+                                                    <Text style={styles.agendaItemTitle}>{event.title}</Text>
+                                                </View>
+                                                <Text style={styles.agendaItemMeta}>{event.time || 'All Day'} · {event.location}</Text>
+
+                                                <View style={styles.itemActionRow}>
+                                                    {event.type === 'custom' && (
+                                                        <TouchableOpacity onPress={() => handleEditItem(event)} style={styles.itemActionBtn}>
+                                                            <Ionicons name="pencil" size={14} color={Colors.primary} />
+                                                            <Text style={styles.itemActionText}>Edit</Text>
+                                                        </TouchableOpacity>
+                                                    )}
+                                                    <TouchableOpacity onPress={() => handleRemoveItem(event)} style={[styles.itemActionBtn, { backgroundColor: Colors.errorLight }]}>
+                                                        <Ionicons 
+                                                            name={event.type === 'academic' ? "eye-off" : "trash"} 
+                                                            size={14} 
+                                                            color={Colors.error} 
+                                                        />
+                                                        <Text style={[styles.itemActionText, { color: Colors.error }]}>
+                                                            {event.type === 'club' ? 'Unregister' : event.type === 'academic' ? 'Hide' : 'Delete'}
+                                                        </Text>
+                                                    </TouchableOpacity>
+                                                </View>
+                                            </View>
+                                        </TouchableOpacity>
+                                    ))}
+                                </View>
+                            )) : (
+                                <View style={styles.emptyState}>
+                                    <Text style={styles.emptyText}>No events or tasks found.</Text>
+                                </View>
+                            )}
+                        </View>
                     </View>
                 )}
                 <View style={{ height: 120 }} />
@@ -406,15 +690,44 @@ export default function CalendarScreen() {
                         
                         <Text style={styles.inputLabel}>CATEGORY</Text>
                         <View style={styles.catRow}>
-                            {['Assignment', 'Deadline', 'Personal', 'Study'].map((cat) => {
+                            {['Exam', 'Event', 'Deadline', 'Personal', 'Study'].map((cat) => {
                                 const isActive = newCategory === cat;
                                 return (
-                                    <TouchableOpacity key={cat} style={[styles.catPill, isActive && styles.catPillActive]} onPress={() => setNewCategory(cat as any)}>
+                                    <TouchableOpacity key={cat} style={[styles.catPill, isActive && { backgroundColor: getCategoryColor(cat), borderColor: getCategoryColor(cat) }]} onPress={() => setNewCategory(cat)}>
                                         <Text style={[styles.catText, isActive && styles.catTextActive]}>{cat}</Text>
                                     </TouchableOpacity>
                                 );
                             })}
                         </View>
+
+                        <Text style={styles.inputLabel}>PRIORITY</Text>
+                        <View style={styles.catRow}>
+                            {['Low', 'Medium', 'High'].map((p) => {
+                                const isActive = newPriority === p;
+                                const pColor = p === 'High' ? Colors.error : p === 'Medium' ? Colors.warning : Colors.success;
+                                return (
+                                    <TouchableOpacity key={p} style={[styles.catPill, isActive && { backgroundColor: pColor, borderColor: pColor }]} onPress={() => setNewPriority(p)}>
+                                        <Text style={[styles.catText, isActive && styles.catTextActive]}>{p}</Text>
+                                    </TouchableOpacity>
+                                );
+                            })}
+                        </View>
+
+                        <View style={styles.switchRow}>
+                            <Text style={styles.inputLabel}>ALL DAY EVENT</Text>
+                            <Switch value={isAllDay} onValueChange={setIsAllDay} trackColor={{ true: Colors.primary }} />
+                        </View>
+
+                        <Text style={styles.inputLabel}>NOTES</Text>
+                        <TextInput 
+                            style={[styles.input, { height: 80, textAlignVertical: 'top' }]} 
+                            placeholder="Add any details..." 
+                            placeholderTextColor={Colors.textDimmed}
+                            value={newNotes} 
+                            onChangeText={setNewNotes}
+                            multiline
+                        />
+
                         <TouchableOpacity style={styles.saveBtn} onPress={handleAddEvent}>
                             <Text style={styles.saveBtnText}>Add to Calendar</Text>
                         </TouchableOpacity>
@@ -428,6 +741,8 @@ export default function CalendarScreen() {
 const styles = StyleSheet.create({
     safe: { flex: 1, backgroundColor: Colors.background },
     scroll: { paddingBottom: 110 },
+    priorityDot: { width: 6, height: 6, borderRadius: 3 },
+    switchRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.lg },
     header: { 
         flexDirection: 'row', 
         alignItems: 'center', 
@@ -470,6 +785,9 @@ const styles = StyleSheet.create({
         backgroundColor: Colors.background, 
         zIndex: 10 
     },
+    filterRowPriority: { flexDirection: 'row', paddingHorizontal: Spacing.section, gap: 8, marginBottom: Spacing.sm },
+    filterChipSmall: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: Radius.pill, borderWidth: 0.5, borderColor: Colors.divider, backgroundColor: Colors.surface },
+    filterChipTextSmall: { ...Typography.micro, color: Colors.textSecondary, fontFamily: 'Sora_600SemiBold' },
     viewToggleRow: { 
         flexDirection: 'row', 
         paddingHorizontal: Spacing.section, 
@@ -494,13 +812,53 @@ const styles = StyleSheet.create({
     viewToggleTextActive: { color: Colors.primary, fontFamily: 'Sora_700Bold' },
     centerLoading: { height: 300, justifyContent: 'center', alignItems: 'center' },
     weekRowWrap: { marginBottom: Spacing.lg },
-    weekScrollContent: { paddingHorizontal: Spacing.section, gap: Spacing.sm },
+    weekNavHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: Spacing.section,
+        marginBottom: Spacing.md,
+    },
+    weekNavBtn: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        backgroundColor: Colors.secondary,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    weekInfo: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+    },
+    weekMonthText: {
+        ...Typography.h4,
+        color: Colors.text,
+        fontFamily: 'Sora_700Bold',
+    },
+    todayLabelBtn: {
+        backgroundColor: Colors.primary,
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: Radius.sm,
+    },
+    todayLabelText: {
+        fontSize: 9,
+        fontFamily: 'Sora_700Bold',
+        color: '#FFF',
+    },
+    weekStripContainer: { 
+        flexDirection: 'row', 
+        paddingHorizontal: Spacing.section, 
+        gap: Spacing.xs 
+    },
     weekDay: { 
-        width: 60, 
-        height: 80,
+        flex: 1, 
+        height: 70,
         alignItems: 'center', 
         justifyContent: 'center',
-        borderRadius: Radius.xl, 
+        borderRadius: Radius.lg, 
         backgroundColor: Colors.surface, 
         borderWidth: 0.5, 
         borderColor: Colors.divider 
@@ -512,6 +870,13 @@ const styles = StyleSheet.create({
     weekDayLabel: { ...Typography.micro, color: Colors.textSecondary, marginBottom: 4 },
     weekDayDate: { ...Typography.h4, color: Colors.text },
     weekDayTextActive: { color: Colors.textLight },
+    weekEventDot: {
+        width: 4,
+        height: 4,
+        borderRadius: 2,
+        position: 'absolute',
+        bottom: 8,
+    },
     sectionHeaderWrap: { paddingHorizontal: Spacing.section, marginBottom: Spacing.md },
     sectionTitle: { ...Typography.h4, color: Colors.text },
     cardsRowContent: { paddingHorizontal: Spacing.section, gap: Spacing.md, paddingBottom: Spacing.md },
@@ -561,9 +926,101 @@ const styles = StyleSheet.create({
     },
     agendaItemTitle: { ...Typography.h5, fontSize: 13, color: Colors.text },
     agendaItemMeta: { ...Typography.caption, color: Colors.textSecondary, marginTop: 2 },
+    itemActionRow: { flexDirection: 'row', gap: 8, marginTop: 10 },
+    itemActionBtn: { 
+        flexDirection: 'row', 
+        alignItems: 'center', 
+        gap: 4, 
+        paddingVertical: 4, 
+        paddingHorizontal: 8, 
+        borderRadius: Radius.sm, 
+        backgroundColor: Colors.secondary 
+    },
+    itemActionText: { ...Typography.micro, fontFamily: 'Sora_700Bold', color: Colors.primary },
+    subtasksList: { marginTop: 8, gap: 4 },
+    subtaskItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+    subtaskText: { ...Typography.micro, color: Colors.textSecondary },
+    subtaskTextDone: { textDecorationLine: 'line-through', color: Colors.mutedForeground },
     emptyState: { paddingVertical: 40, alignItems: 'center' },
     emptyText: { ...Typography.body2, color: Colors.textSecondary, textAlign: 'center' },
     fullTimelineWrap: { paddingHorizontal: Spacing.section },
+    calendarHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: Spacing.lg,
+        backgroundColor: Colors.surface,
+        padding: Spacing.sm,
+        borderRadius: Radius.lg,
+        borderWidth: 0.5,
+        borderColor: Colors.divider,
+    },
+    monthNavBtn: {
+        width: 36,
+        height: 36,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderRadius: Radius.md,
+        backgroundColor: Colors.secondary,
+    },
+    currentMonthText: {
+        ...Typography.h4,
+        color: Colors.text,
+        fontFamily: 'Sora_700Bold',
+    },
+    calendarGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        marginBottom: Spacing.xl,
+    },
+    weekdayLabel: {
+        width: `${100 / 7}%`,
+        textAlign: 'center',
+        ...Typography.micro,
+        color: Colors.textTertiary,
+        marginBottom: Spacing.sm,
+        fontFamily: 'Sora_700Bold',
+    },
+    calendarDay: {
+        width: `${100 / 7}%`,
+        height: 44,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 4,
+        borderRadius: Radius.md,
+    },
+    calendarDaySelected: {
+        backgroundColor: Colors.primary,
+    },
+    calendarDayOutside: {
+        opacity: 0.3,
+    },
+    calendarDayText: {
+        ...Typography.caption,
+        color: Colors.text,
+        fontFamily: 'Sora_600SemiBold',
+    },
+    calendarDayTextSelected: {
+        color: '#FFF',
+        fontFamily: 'Sora_700Bold',
+    },
+    calendarDayTextOutside: {
+        color: Colors.textSecondary,
+    },
+    eventBadge: {
+        width: 14,
+        height: 14,
+        borderRadius: 7,
+        alignItems: 'center',
+        justifyContent: 'center',
+        position: 'absolute',
+        bottom: 4,
+        right: 4,
+    },
+    eventBadgeText: {
+        fontSize: 8,
+        fontFamily: 'Sora_700Bold',
+    },
     sectionHeader: { ...Typography.micro, color: Colors.textTertiary, letterSpacing: 1, marginTop: Spacing.lg, marginBottom: Spacing.sm },
     timelineItem: { 
         flexDirection: 'row', 
@@ -576,7 +1033,6 @@ const styles = StyleSheet.create({
     timelineIconWrap: { width: 32, height: 32, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
     timelineTitle: { ...Typography.h5, color: Colors.text, flex: 1 },
     timelineMeta: { ...Typography.caption, color: Colors.textSecondary, marginTop: 2 },
-    listContent: { paddingBottom: 40 },
     modalOverlay: { flex: 1, backgroundColor: Colors.overlayDark, justifyContent: 'flex-end' },
     modalContent: { backgroundColor: Colors.cardBg, borderTopLeftRadius: Radius.xxl, borderTopRightRadius: Radius.xxl, padding: Spacing.xl, paddingBottom: 40 },
     modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.xl },

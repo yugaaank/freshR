@@ -153,6 +153,17 @@ export default function AcademicDashboard() {
                                         </View>
                                         <ProgressRing progress={att} size={56} strokeWidth={5} color={ringColor} label={`${att}%`} />
                                     </View>
+                                    
+                                    <View style={styles.syllabusTracker}>
+                                        <View style={styles.syllabusLabelRow}>
+                                            <Text style={styles.syllabusLabel}>Syllabus Completion</Text>
+                                            <Text style={styles.syllabusVal}>{item.syllabus_progress ?? 65}%</Text>
+                                        </View>
+                                        <View style={styles.progressBarBg}>
+                                            <View style={[styles.progressBarFill, { width: `${item.syllabus_progress ?? 65}%`, backgroundColor: item.grade_point >= 9 ? Colors.success : Colors.primary }]} />
+                                        </View>
+                                    </View>
+
                                     <View style={styles.subjectBottom}>
                                         <TagPill
                                             label={`${item.grade} · ${item.grade_point}/10`}
@@ -262,6 +273,12 @@ const styles = StyleSheet.create({
     subjectCode: { ...Typography.micro, color: Colors.primary, letterSpacing: 1.2 },
     subjectName: { ...Typography.h5, color: Colors.text },
     subjectProf: { ...Typography.caption, color: Colors.textSecondary, marginTop: 2 },
+    syllabusTracker: { marginVertical: Spacing.sm },
+    syllabusLabelRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
+    syllabusLabel: { ...Typography.micro, color: Colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5 },
+    syllabusVal: { ...Typography.micro, color: Colors.text, fontFamily: 'Sora_700Bold' },
+    progressBarBg: { height: 6, backgroundColor: Colors.secondary, borderRadius: 3, overflow: 'hidden' },
+    progressBarFill: { height: '100%', borderRadius: 3 },
     subjectBottom: { flexDirection: 'row', alignItems: 'center', gap: 12, flexWrap: 'wrap' },
     nextClass: { ...Typography.caption, color: Colors.textTertiary },
     assignmentList: { paddingHorizontal: Spacing.section, gap: 12 },

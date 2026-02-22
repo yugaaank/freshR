@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "FreshR",
-    "slug": "freshr",
+    "slug": "hackathon",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -52,6 +52,7 @@
       "eas": {
         "projectId": "25923851-d1e5-4d06-bc58-0835e0819b86"
       }
-    }
+    },
+    "owner": "yugaaank"
   }
 }

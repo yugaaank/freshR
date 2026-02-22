@@ -26,6 +26,8 @@ import { useAssignments } from '../../src/hooks/useAcademics';
 import { useEvents } from '../../src/hooks/useEvents';
 import { useCartStore } from '../../src/store/cartStore';
 import { useCalendarStore } from '../../src/store/calendarStore';
+import { usePersonalEvents } from '../../src/hooks/useCalendar';
+import { useRegisteredEvents } from '../../src/hooks/useEvents';
 import { useRestaurants, useMenuItems } from '../../src/hooks/useFood';
 import { Colors, Radius, Spacing, Typography, Gradients, Palette } from '../../src/theme';
 import dayjs from 'dayjs';
@@ -33,13 +35,14 @@ import dayjs from 'dayjs';
 const { width: SW, height: SH } = Dimensions.get('window');
 
 const SHORTCUTS = [
-  { id: 'coding', title: 'Coding Challenge', icon: 'code-slash' as const, route: '/coding-challenge', keywords: ['daily', 'problem', 'solve', 'javascript', 'typescript'] },
-  { id: 'faculty', title: 'Faculty Directory', icon: 'people' as const, route: '/teachers', keywords: ['teachers', 'professors', 'staff', 'office', 'cabin'] },
+  { id: 'focus', title: 'Study Focus', icon: 'timer' as const, route: '/focus', keywords: ['pomodoro', 'study', 'timer', 'concentrate'] },
+  { id: 'pdf', title: 'Print PDF', icon: 'document-text' as const, route: '/print', keywords: ['print', 'pdf', 'document', 'express', 'stationery'] },
+  { id: 'id-card', title: 'Virtual ID', icon: 'person-circle' as const, route: '/virtual-id', keywords: ['card', 'identity', 'profile', 'student', 'id'] },
+  { id: 'coding', title: 'Daily Quiz', icon: 'code-slash' as const, route: '/coding-challenge', keywords: ['daily', 'problem', 'solve', 'javascript', 'typescript'] },
   { id: 'map', title: 'Campus Map', icon: 'map' as const, route: '/campus-map', keywords: ['navigation', 'location', 'where', 'building', 'library'] },
-  { id: 'print', title: 'Print & Stationery', icon: 'print' as const, route: '/print', keywords: ['copy', 'stationery', 'paper', 'request', 'pickup'] },
+  { id: 'faculty', title: 'Faculty Directory', icon: 'people' as const, route: '/teachers', keywords: ['teachers', 'professors', 'staff', 'office', 'cabin'] },
   { id: 'grades', title: 'Grades & GPA', icon: 'school' as const, route: '/grades', keywords: ['results', 'sgpa', 'cgpa', 'marks', 'academic'] },
   { id: 'attendance', title: 'Attendance', icon: 'checkmark-done' as const, route: '/attendance', keywords: ['presence', 'classes', 'history'] },
-  { id: 'food', title: 'Food Ordering', icon: 'fast-food' as const, route: '/(tabs)/food', keywords: ['canteen', 'menu', 'lunch', 'dinner', 'snacks', 'eat'] },
 ];
 
 export default function HomeScreen() {
@@ -52,10 +55,14 @@ export default function HomeScreen() {
   const { data: menuItems = [] } = useMenuItems();
   
   const activeOrderId = useCartStore(s => s.activeOrderId);
-  const { registeredEvents, profile } = useUserStore();
+  const { profile } = useUserStore();
   const streakData = useChallengeStore(s => s.streakData);
   const { data: assignments = [] } = useAssignments(profile?.id ?? null);
-  const customEvents = useCalendarStore(s => s.customEvents);
+  
+  // DB Source of Truth
+  const userId = profile?.id ?? '11111111-1111-1111-1111-111111111111';
+  const { data: personalEvents = [] } = usePersonalEvents(userId);
+  const { data: registeredEventIds = [] } = useRegisteredEvents(userId);
 
   const filteredAlerts = useMemo(() => {
     return liveAlerts.filter((alert: any) => !alert.title.toLowerCase().includes('mess menu'));
@@ -66,8 +73,8 @@ export default function HomeScreen() {
   const [activeAlertIndex, setActiveAlertIndex] = useState(0);
 
   const recentlyRegistered = useMemo(() => {
-    return storeEvents.filter(e => registeredEvents.includes(e.id)).slice(0, 2);
-  }, [storeEvents, registeredEvents]);
+    return storeEvents.filter(e => registeredEventIds.includes(e.id)).slice(0, 2);
+  }, [storeEvents, registeredEventIds]);
 
   // Debounce search
   useEffect(() => {
@@ -138,15 +145,53 @@ export default function HomeScreen() {
 
   const todayCustomEventsCount = useMemo(() => {
     const today = dayjs().format('YYYY-MM-DD');
-    return customEvents.filter(e => e.date === today).length;
-  }, [customEvents]);
+    return personalEvents.filter(e => dayjs(e.date).format('YYYY-MM-DD') === today).length;
+  }, [personalEvents]);
 
   const todayClubEventsCount = useMemo(() => {
     const today = dayjs().format('YYYY-MM-DD');
-    return storeEvents.filter((e: any) => e.date === today).length;
-  }, [storeEvents]);
+    return storeEvents.filter((e: any) => 
+      registeredEventIds.includes(e.id) && 
+      dayjs(e.date).format('YYYY-MM-DD') === today
+    ).length;
+  }, [storeEvents, registeredEventIds]);
 
   const totalTodayEvents = todayClubEventsCount + todayCustomEventsCount;
+
+  const burnoutRisk = useMemo(() => {
+    const next48Hours = dayjs().add(48, 'hour');
+    const highPriorityCount = personalEvents.filter(e => 
+      e.priority === 'High' && 
+      dayjs(e.date).isBefore(next48Hours) && 
+      dayjs(e.date).isAfter(dayjs().subtract(1, 'hour'))
+    ).length;
+    return highPriorityCount >= 3;
+  }, [personalEvents]);
+
+  const nextAcademicTarget = useMemo(() => {
+    const all = [...personalEvents].filter(e => e.category === 'Exam' || e.category === 'Deadline');
+    if (!all.length) return null;
+    return all.sort((a, b) => dayjs(a.date).diff(dayjs(b.date)))[0];
+  }, [personalEvents]);
+
+  const [countdown, setCountdown] = useState('');
+
+  useEffect(() => {
+    if (!nextAcademicTarget) return;
+    const interval = setInterval(() => {
+      const diff = dayjs(nextAcademicTarget.date).diff(dayjs());
+      if (diff <= 0) {
+        setCountdown('Time up!');
+        clearInterval(interval);
+        return;
+      }
+      const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+      const hours = Math.floor((diff / (1000 * 60 * 60)) % 24);
+      const mins = Math.floor((diff / (1000 * 60)) % 60);
+      setCountdown(`${days}d ${hours}h ${mins}m`);
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [nextAcademicTarget]);
 
   const navigateToResult = (route: string) => {
     Keyboard.dismiss();
@@ -272,6 +317,15 @@ export default function HomeScreen() {
             </View>
           ) : (
             <View>
+              {burnoutRisk && (
+                <View style={styles.burnoutAlert}>
+                  <Ionicons name="warning" size={20} color={Colors.error} />
+                  <Text style={styles.burnoutText}>
+                    Burnout Risk Detected! You have 3+ high priority tasks in 48h. Consider a break at the canteen.
+                  </Text>
+                </View>
+              )}
+
               {activeOrderId && (
                 <TouchableOpacity 
                   style={styles.activeOrderBanner}
@@ -302,6 +356,20 @@ export default function HomeScreen() {
                   </View>
                 </View>
               </TouchableOpacity>
+
+              {nextAcademicTarget && (
+                <View style={styles.countdownSection}>
+                  <LinearGradient colors={['#EF4444', '#B91C1C']} style={styles.countdownCard}>
+                    <View style={styles.countdownLeft}>
+                      <Text style={styles.countdownLabel}>NEXT {nextAcademicTarget.category.toUpperCase()}</Text>
+                      <Text style={styles.countdownTitle} numberOfLines={1}>{nextAcademicTarget.title}</Text>
+                    </View>
+                    <View style={styles.countdownRight}>
+                      <Text style={styles.countdownTimer}>{countdown}</Text>
+                    </View>
+                  </LinearGradient>
+                </View>
+              )}
 
               {filteredAlerts.length > 0 && (
                 <View style={styles.carouselContainer}>
@@ -342,13 +410,13 @@ export default function HomeScreen() {
               <View style={styles.shortcutsSection}>
                 <Text style={styles.shortcutsTitle}>Shortcuts</Text>
                 <View style={styles.shortcutsGrid}>
-                  {SHORTCUTS.slice(0, 4).map((shortcut, idx) => {
+                  {SHORTCUTS.slice(0, 12).map((shortcut, idx) => {
                     return (
                       <TouchableOpacity key={shortcut.id} style={styles.shortcutItem} onPress={() => router.push(shortcut.route as any)}>
                         <View style={styles.shortcutIconWrap}>
                           <Ionicons name={shortcut.icon} size={22} color={Colors.primary} />
                         </View>
-                        <Text style={styles.shortcutText}>{shortcut.title.split(' ')[0]}</Text>
+                        <Text style={[styles.shortcutText, { textAlign: 'center' }]} numberOfLines={2}>{shortcut.title}</Text>
                       </TouchableOpacity>
                     );
                   })}
@@ -380,6 +448,31 @@ export default function HomeScreen() {
                   </View>
                 </View>
               )}
+
+              <View style={styles.streakSection}>
+                <View style={styles.streakHeader}>
+                  <Text style={styles.streakTitle}>Productivity Analytics</Text>
+                  <Text style={styles.streakCount}>Score: 850 🏆</Text>
+                </View>
+                <Card style={styles.streakCard}>
+                  <View style={styles.statsRowMain}>
+                    <View style={styles.statBox}>
+                      <Text style={styles.statValMain}>92%</Text>
+                      <Text style={styles.statLabelMain}>Completion</Text>
+                    </View>
+                    <View style={styles.statDivider} />
+                    <View style={styles.statBox}>
+                      <Text style={styles.statValMain}>12.5h</Text>
+                      <Text style={styles.statLabelMain}>Focus Time</Text>
+                    </View>
+                    <View style={styles.statDivider} />
+                    <View style={styles.statBox}>
+                      <Text style={styles.statValMain}>4</Text>
+                      <Text style={styles.statLabelMain}>Tasks Done</Text>
+                    </View>
+                  </View>
+                </Card>
+              </View>
 
               <View style={styles.streakSection}>
                 <View style={styles.streakHeader}>
@@ -514,6 +607,19 @@ const styles = StyleSheet.create({
   activeOrderIconWrap: { width: 36, height: 36, borderRadius: 18, backgroundColor: Colors.primary, alignItems: 'center', justifyContent: 'center' },
   activeOrderTitle: { ...Typography.h5, color: Colors.text },
   activeOrderSub: { ...Typography.caption, color: Colors.textSecondary, marginTop: 2 },
+  burnoutAlert: {
+    marginHorizontal: Spacing.section,
+    marginVertical: Spacing.sm,
+    backgroundColor: Colors.errorLight,
+    padding: 12,
+    borderRadius: Radius.lg,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    borderWidth: 1,
+    borderColor: Colors.error + '20',
+  },
+  burnoutText: { ...Typography.caption, color: Colors.error, flex: 1, fontFamily: 'Sora_600SemiBold' },
   spotlightWrap: { 
     marginHorizontal: Spacing.section, 
     marginVertical: Spacing.md, 
@@ -535,6 +641,13 @@ const styles = StyleSheet.create({
     alignItems: 'center', 
     justifyContent: 'center',
   },
+  countdownSection: { paddingHorizontal: Spacing.section, marginBottom: Spacing.md },
+  countdownCard: { flexDirection: 'row', alignItems: 'center', padding: 16, borderRadius: Radius.xl, gap: 12 },
+  countdownLeft: { flex: 1 },
+  countdownLabel: { ...Typography.micro, color: 'rgba(255,255,255,0.7)', letterSpacing: 1 },
+  countdownTitle: { ...Typography.h4, color: '#FFF', marginTop: 2 },
+  countdownRight: { backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 12, paddingVertical: 8, borderRadius: Radius.lg },
+  countdownTimer: { ...Typography.h4, color: '#FFF', fontFamily: 'Sora_700Bold' },
   carouselContainer: { marginBottom: Spacing.lg },
   alertsCarousel: { paddingHorizontal: Spacing.section, gap: 12 },
   alertCard: { 
@@ -552,8 +665,8 @@ const styles = StyleSheet.create({
   alertDesc: { ...Typography.body2, color: Colors.textSecondary, marginTop: 2 },
   shortcutsSection: { paddingHorizontal: Spacing.section, marginBottom: Spacing.lg },
   shortcutsTitle: { ...Typography.h4, color: Colors.text, marginBottom: 16 },
-  shortcutsGrid: { flexDirection: 'row', justifyContent: 'space-between' },
-  shortcutItem: { alignItems: 'center', width: (SW - Spacing.section * 2) / 4.5 },
+  shortcutsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, justifyContent: 'flex-start' },
+  shortcutItem: { alignItems: 'center', width: (SW - (Spacing.section * 2) - 36) / 4, marginBottom: 8 },
   shortcutIconWrap: { 
     width: 50, 
     height: 50, 
@@ -593,5 +706,10 @@ const styles = StyleSheet.create({
   streakTitle: { ...Typography.h4, color: Colors.text },
   streakCount: { ...Typography.caption, color: Colors.primary, fontFamily: 'Sora_700Bold' },
   streakCard: { padding: 12, borderRadius: Radius.xl, backgroundColor: Colors.background, borderWidth: 0.5, borderColor: Colors.divider },
+  statsRowMain: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8 },
+  statBox: { flex: 1, alignItems: 'center' },
+  statValMain: { ...Typography.h3, color: Colors.text },
+  statLabelMain: { ...Typography.micro, color: Colors.textSecondary, marginTop: 4 },
+  statDivider: { width: 1, height: 30, backgroundColor: Colors.divider },
   bottomFade: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 60, zIndex: 10 },
 });

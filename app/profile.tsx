@@ -51,6 +51,7 @@ export default function ProfileScreen() {
                   else if (card.id === 'attendance') router.push('/attendance');
                   else if (card.id === 'orders') router.push('/food-orders');
                   else if (card.id === 'stationery') router.push('/stationery-orders');
+                  else if (card.id === 'id-card') router.push('/virtual-id');
                   else if (card.id === 'events') router.push('/(tabs)/explore');
                   else Alert.alert('Coming Soon', `${card.label} feature is arriving in the next update!`);
                 }}

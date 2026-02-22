@@ -136,18 +136,28 @@ export default function FoodScreen() {
                     <Text style={styles.welcomeText}>Craving something?</Text>
                     <Text style={styles.nameText}>{profile?.name?.split(' ')[0] ?? 'Yugank'}'s Kitchen</Text>
                 </View>
-                <TouchableOpacity
-                    style={styles.cartIconWrap}
-                    onPress={() => router.push('/cart')}
-                    activeOpacity={0.85}
-                >
-                    <Ionicons name="cart-outline" size={22} color={Colors.text} />
-                    {cartCount > 0 && (
-                        <View style={styles.badgeCircle}>
-                            <Text style={styles.badgeText}>{cartCount}</Text>
-                        </View>
-                    )}
-                </TouchableOpacity>
+                <View style={styles.headerActions}>
+                    <TouchableOpacity
+                        style={styles.trackOrderBtn}
+                        onPress={() => router.push('/order-tracking')}
+                        activeOpacity={0.85}
+                    >
+                        <Ionicons name="location-outline" size={16} color={Colors.primary} />
+                        <Text style={styles.trackOrderText}>Track Order</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        style={styles.cartIconWrap}
+                        onPress={() => router.push('/cart')}
+                        activeOpacity={0.85}
+                    >
+                        <Ionicons name="cart-outline" size={22} color={Colors.text} />
+                        {cartCount > 0 && (
+                            <View style={styles.badgeCircle}>
+                                <Text style={styles.badgeText}>{cartCount}</Text>
+                            </View>
+                        )}
+                    </TouchableOpacity>
+                </View>
             </View>
 
             <ScrollView
@@ -400,6 +410,27 @@ const styles = StyleSheet.create({
     },
     welcomeText: { ...Typography.caption, color: Colors.textSecondary },
     nameText: { ...Typography.h2, color: Colors.text },
+    headerActions: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: Spacing.sm,
+    },
+    trackOrderBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: Colors.primaryLight,
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        borderRadius: Radius.pill,
+        gap: 6,
+        borderWidth: 1,
+        borderColor: Colors.primary + '20',
+    },
+    trackOrderText: {
+        ...Typography.micro,
+        color: Colors.primary,
+        fontFamily: 'Sora_700Bold',
+    },
     cartIconWrap: {
         width: 40,
         height: 40,

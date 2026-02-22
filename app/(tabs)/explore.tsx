@@ -32,6 +32,7 @@ export default function ExploreScreen() {
     const { followedClubs } = useUserStore();
     const [searchQuery, setSearchQuery] = useState('');
     const [activeFilter, setActiveFilter] = useState('All');
+    const [showAllEvents, setShowAllEvents] = useState(false);
 
     const isLoading = clubsLoading || eventsLoading;
 
@@ -51,7 +52,7 @@ export default function ExploreScreen() {
     }, [events]);
 
     const recommendedEvents = useMemo(() => {
-        const base = [...upcomingEvents];
+        const base = showAllEvents ? [...events] : [...upcomingEvents];
         const query = searchQuery.toLowerCase();
         return base.filter((event) => {
             if (activeFilter !== 'All' && event.category !== activeFilter) {
@@ -62,7 +63,7 @@ export default function ExploreScreen() {
             }
             return true;
         });
-    }, [searchQuery, activeFilter, upcomingEvents]);
+    }, [searchQuery, activeFilter, upcomingEvents, events, showAllEvents]);
 
     if (isLoading) {
         return (
@@ -175,10 +176,17 @@ export default function ExploreScreen() {
 
                 <View style={styles.sectionBlock}>
                     <View style={styles.sectionHeaderWrap}>
-                        <Text style={styles.sectionTitle}>Live & Upcoming</Text>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <Text style={styles.sectionTitle}>Live & Upcoming</Text>
+                            {!showAllEvents && events.length > 4 && (
+                                <TouchableOpacity onPress={() => setShowAllEvents(true)}>
+                                    <Text style={styles.seeAllText}>See All</Text>
+                                </TouchableOpacity>
+                            )}
+                        </View>
                     </View>
                     <View style={styles.eventList}>
-                        {recommendedEvents.slice(0, 4).map((eventItem) => (
+                        {(showAllEvents ? recommendedEvents : recommendedEvents.slice(0, 4)).map((eventItem) => (
                             <EventListItem key={eventItem.id} event={eventItem} />
                         ))}
                         {!recommendedEvents.length && (
@@ -327,6 +335,11 @@ const styles = StyleSheet.create({
     },
     sectionHeaderWrap: { paddingHorizontal: Spacing.section, marginBottom: Spacing.md },
     sectionTitle: { ...Typography.h4, color: Colors.text },
+    seeAllText: {
+        ...Typography.caption,
+        color: Colors.primary,
+        fontFamily: 'Sora_700Bold',
+    },
     popularRow: {
         paddingHorizontal: Spacing.section,
         gap: Spacing.md,

@@ -16,10 +16,6 @@ import QRCode from 'react-native-qrcode-svg';
 import * as Haptics from 'expo-haptics';
 import { Colors, Radius, Spacing, Typography } from '../../src/theme';
 
-function createPaymentCode() {
-    return `QR-${Date.now().toString().slice(-6)}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
-}
-
 export default function CartScreen() {
     const cart = useCartStore();
     const { authUser } = useUserStore();
@@ -41,15 +37,10 @@ export default function CartScreen() {
             console.log('Attempting checkout for user:', userId);
             const orderId = await cart.checkout(userId);
             
-            setQrCode(createPaymentCode());
+            setQrCode(orderId);
             setCollected(false);
             
-            Alert.alert("Payment Successful", "Your order has been placed!", [
-                { text: "Track Order", onPress: () => {
-                    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-                    router.push({ pathname: '/order-tracking', params: { orderId } });
-                }}
-            ]);
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         } catch (error: any) {
             console.error('Checkout failed:', error);
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
@@ -59,7 +50,7 @@ export default function CartScreen() {
 
     const handleCollected = () => {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        cart.clearCart();
+        cart.clearActiveOrder();
         setCollected(true);
         router.replace('/(tabs)/food');
     };
@@ -70,30 +61,36 @@ export default function CartScreen() {
                 <TouchableOpacity onPress={() => router.back()} style={styles.backIcon}>
                     <Ionicons name="chevron-back" size={24} color={Colors.text} />
                 </TouchableOpacity>
-                <Text style={styles.title}>Pay & collect</Text>
+                <Text style={styles.title}>Cart summary</Text>
             </View>
             <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-                <Text style={styles.sectionTitle}>Cart summary</Text>
-                {items.map((entry) => (
-                    <View key={entry.item.id} style={styles.lineItem}>
-                        <View>
-                            <Text style={styles.lineTitle}>{entry.item.name}</Text>
-                            <Text style={styles.lineMeta}>
-                                {entry.quantity} × ₹{entry.item.price}
-                            </Text>
+                {!qrCode && (
+                    <>
+                        <Text style={styles.sectionTitle}>Review your items</Text>
+                        {items.map((entry) => (
+                            <View key={entry.item.id} style={styles.lineItem}>
+                                <View>
+                                    <Text style={styles.lineTitle}>{entry.item.name}</Text>
+                                    <Text style={styles.lineMeta}>
+                                        {entry.quantity} × ₹{entry.item.price}
+                                    </Text>
+                                </View>
+                                <Text style={styles.lineTotal}>₹{entry.item.price * entry.quantity}</Text>
+                            </View>
+                        ))}
+                        {!items.length && !qrCode && <Text style={styles.empty}>Your cart is empty.</Text>}
+                        <View style={styles.totalRow}>
+                            <Text style={styles.totalLabel}>Total Payable</Text>
+                            <Text style={styles.totalValue}>₹{total}</Text>
                         </View>
-                        <Text style={styles.lineTotal}>₹{entry.item.price * entry.quantity}</Text>
-                    </View>
-                ))}
-                {!items.length && <Text style={styles.empty}>Your cart is empty.</Text>}
-                <View style={styles.totalRow}>
-                    <Text style={styles.totalLabel}>Total</Text>
-                    <Text style={styles.totalValue}>₹{total}</Text>
-                </View>
+                    </>
+                )}
 
                 {qrCode ? (
                     <View style={styles.qrCard}>
-                        <Text style={styles.qrLabel}>Show this QR at collection</Text>
+                        <Ionicons name="checkmark-circle" size={48} color={Colors.success} style={{ marginBottom: 12 }} />
+                        <Text style={styles.successTitle}>Payment Successful!</Text>
+                        <Text style={styles.qrLabel}>Show this QR at the counter for collection</Text>
                         <View style={styles.qrCode}>
                             <QRCode
                                 value={qrCode}
@@ -102,13 +99,19 @@ export default function CartScreen() {
                                 backgroundColor="transparent"
                             />
                         </View>
-                        {collected ? (
-                            <Text style={styles.scannedText}>Collection confirmed.</Text>
-                        ) : (
+                        <Text style={styles.orderIdText}>Order ID: #{qrCode.slice(-6).toUpperCase()}</Text>
+                        
+                        <View style={styles.qrActions}>
                             <TouchableOpacity style={styles.scannedBtn} onPress={handleCollected}>
-                                <Text style={styles.scannedBtnText}>Mark as collected</Text>
+                                <Text style={styles.scannedBtnText}>I have collected my food</Text>
                             </TouchableOpacity>
-                        )}
+                            <TouchableOpacity 
+                                style={styles.trackLink} 
+                                onPress={() => router.push({ pathname: '/order-tracking', params: { orderId: qrCode } })}
+                            >
+                                <Text style={styles.trackLinkText}>View detailed tracking status</Text>
+                            </TouchableOpacity>
+                        </View>
                     </View>
                 ) : (
                     <TouchableOpacity
@@ -116,7 +119,7 @@ export default function CartScreen() {
                         disabled={!items.length}
                         onPress={handlePay}
                     >
-                        <Text style={styles.payBtnText}>Pay ₹{total || 0}</Text>
+                        <Text style={styles.payBtnText}>Pay & Place Order · ₹{total || 0}</Text>
                     </TouchableOpacity>
                 )}
             </ScrollView>
@@ -212,43 +215,66 @@ const styles = StyleSheet.create({
         fontWeight: '700' as const,
     },
     qrCard: {
-        marginTop: Spacing.lg,
+        marginTop: Spacing.sm,
         borderRadius: Radius.xxl,
-        padding: Spacing.md,
+        padding: Spacing.xl,
         backgroundColor: Colors.surface,
         borderWidth: 1,
         borderColor: Colors.divider,
         alignItems: 'center',
     },
+    successTitle: {
+        ...Typography.h3,
+        color: Colors.text,
+        marginBottom: 8,
+    },
     qrLabel: {
         ...Typography.caption,
         color: Colors.textSecondary,
-        marginBottom: Spacing.sm,
+        marginBottom: Spacing.lg,
+        textAlign: 'center',
     },
     qrCode: {
-        width: 220,
-        height: 220,
-        borderRadius: Radius.xxl,
-        backgroundColor: '#FFF', // Changed to white for better QR contrast
+        padding: Spacing.md,
+        borderRadius: Radius.lg,
+        backgroundColor: '#FFF',
         alignItems: 'center',
         justifyContent: 'center',
         marginBottom: Spacing.md,
         borderWidth: 1,
         borderColor: Colors.divider,
     },
+    orderIdText: {
+        ...Typography.micro,
+        color: Colors.textSecondary,
+        fontFamily: 'Sora_700Bold',
+        letterSpacing: 1,
+        marginBottom: Spacing.xl,
+    },
+    qrActions: {
+        width: '100%',
+        gap: Spacing.md,
+        alignItems: 'center',
+    },
     scannedBtn: {
         backgroundColor: Colors.success,
-        borderRadius: Radius.md,
-        paddingVertical: Spacing.sm,
-        paddingHorizontal: Spacing.lg,
+        borderRadius: Radius.pill,
+        paddingVertical: Spacing.md,
+        width: '100%',
+        alignItems: 'center',
     },
     scannedBtnText: {
         ...Typography.body1,
         color: '#fff',
-        fontWeight: '600' as const,
+        fontWeight: '700' as const,
     },
-    scannedText: {
-        ...Typography.body2,
-        color: Colors.success,
+    trackLink: {
+        paddingVertical: Spacing.sm,
+    },
+    trackLinkText: {
+        ...Typography.caption,
+        color: Colors.primary,
+        fontFamily: 'Sora_600SemiBold',
+        textDecorationLine: 'underline',
     },
 });
