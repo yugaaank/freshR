@@ -1,38 +1,29 @@
 # freshr 🎓
 
-> **The all-in-one campus super-app for MIT Manipal students.**
-> Built with React Native + Expo at a hackathon.
+> **The all-in-one campus super-app for students.**
+> A high-performance, visually stunning mobile companion built with React Native, Expo, and Supabase.
 
 ---
 
 ## ✨ What is freshr?
 
-freshr is a mobile-first campus companion that brings everything a college student needs into one beautifully designed app — from ordering food at the canteen to tracking event registrations, solving daily coding challenges, and scrolling a TikTok-style club feed.
+freshr is a modern campus ecosystem that consolidates essential student services into a single, cohesive experience. From ordering food and tracking attendance to discovering club events via a vertical reel feed, freshr is designed to make campus life seamless and engaging.
 
 ---
 
-## 📱 Screenshots & screens
+## 📱 Core Features
 
-| Tab | Description |
+| Feature | Description |
 |-----|-------------|
-| 🏠 **Home** | Personalised dashboard with a featured event hero, campus alerts, quick-access service grid, upcoming events strip, and a daily coding streak banner |
-| 🌊 **Waves** | Full-screen vertical reel feed (Instagram Reels–style) for club posts — like, share, follow clubs, and RSVP to embedded events inline |
-| 🧭 **Explore** | Browse all campus events and clubs with filter pills and animated spring cards |
-| 🍱 **Food** | Order food from campus counters — search menus, add to cart, track orders, and view order history |
-| 📅 **Calendar** | Visual calendar view of registered and upcoming events |
-
-### Additional screens
-
-- **Event Detail** (`/event/[id]`) — Full event page with ticket types, attendee count, seat urgency indicator, and one-tap registration
-- **Club Detail** (`/club/[id]`) — Club profile with posts and event listings
-- **Coding Challenge** (`/coding-challenge`) — Daily DSA problem with streak tracking
-- **Faculty Directory** (`/teachers`) — Find and contact faculty members
-- **Campus Map** (`/campus-map`) — Interactive map to navigate the campus
-- **Print Shop** (`/print`) — Upload a PDF and schedule a 10-minute pick-up window at the stationery
-- **Order Tracking** (`/order-tracking`) — Real-time food order status
-- **Profile** (`/profile`) — Student profile and settings
-- **Attendance** (`/attendance`) — Attendance tracker
-- **Grades** (`/grades`) — Academic grades overview
+| 🏠 **Smart Dashboard** | Personalized home with featured events, real-time campus alerts, and quick-action service grids. |
+| 🌊 **Waves Feed** | Vertical video/post feed (Reels-style) for campus clubs. Discover culture, follow clubs, and RSVP to events inline. |
+| 🧭 **Campus Explore** | Searchable directory of all campus events and clubs with advanced filtering and animated spring cards. |
+| 🍱 **Smart Dining** | Full-stack food ordering system — browse menus, manage carts, track real-time order status, and view history. |
+| 📅 **Dynamic Calendar** | Integrated view of registered events and personal tasks with progress tracking and productivity analytics. |
+| 💻 **Daily Challenge** | Gamified coding streak system with daily DSA problems to keep your technical skills sharp. |
+| 📚 **Academics** | Integrated attendance tracker, grade overview, and assignment management. |
+| 🗺️ **Interactive Map** | Navigate campus landmarks like libraries, labs, and food courts with real-time distance calculation. |
+| 🖨️ **Digital Print** | Upload documents and schedule quick pick-up slots at the campus stationery shop. |
 
 ---
 
@@ -40,129 +31,107 @@ freshr is a mobile-first campus companion that brings everything a college stude
 
 | Layer | Technology |
 |-------|-----------|
-| Framework | [Expo](https://expo.dev) ~54 (SDK 54) + Expo Router v6 (file-based routing) |
-| Language | TypeScript 5.9 + React 19 |
-| UI | React Native 0.81 · `expo-linear-gradient` · `expo-image` · `expo-blur` |
-| Animations | `react-native-reanimated` 4 · `react-native-gesture-handler` |
-| State | [Zustand](https://zustand-demo.pmnd.rs/) 5 — `hybridStore`, `cartStore`, `userStore` |
-| Data fetching | TanStack React Query 5 |
-| Fonts | Sora (400 / 600 / 700 / 800) via `@expo-google-fonts/sora` |
-| Icons | `@expo/vector-icons` (Ionicons) |
-| Navigation | Expo Router (file-based) + React Navigation Bottom Tabs |
-| Build | EAS Build (`eas.json`) |
+| **Framework** | [Expo SDK 54](https://expo.dev) + [Expo Router](https://expo.github.io/router) (File-based routing) |
+| **Language** | TypeScript 5.9 + React 19 |
+| **Runtime** | React Native 0.81.5 |
+| **Backend** | [Supabase](https://supabase.com) (Auth, PostgreSQL, Realtime, Storage) |
+| **State** | [Zustand](https://zustand-demo.pmnd.rs/) 5 (Modular stores for Cart, Events, User, etc.) |
+| **Data Fetching** | [TanStack React Query v5](https://tanstack.com/query) |
+| **Animations** | `react-native-reanimated` 4 + `react-native-gesture-handler` |
+| **UI Components** | Custom design system using `expo-blur`, `expo-linear-gradient`, and `expo-symbols` |
+| **Typography** | Sora & DM Sans via Google Fonts |
 
 ---
 
-## 🚀 Getting started
+## 🚀 Getting Started
 
 ### Prerequisites
 
 - Node.js ≥ 18
 - npm or yarn
-- [Expo Go](https://expo.dev/go) on your physical device **or** an Android/iOS simulator
+- [Expo Go](https://expo.dev/go) on your device or an Android/iOS emulator
+
+### Environment Setup
+
+Create a `.env` file in the root directory:
+
+```env
+EXPO_PUBLIC_SUPABASE_URL=your_supabase_project_url
+EXPO_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+```
 
 ### Installation
 
 ```bash
-# 1. Clone the repo
+# 1. Clone the repository
 git clone <repo-url>
-cd hackathon
+cd freshR
 
 # 2. Install dependencies
 npm install
 
-# 3. Start the dev server
+# 3. Start the development server
 npx expo start
 ```
 
-After the dev server starts, scan the QR code with **Expo Go** (Android) or your **Camera app** (iOS), or press:
-
-| Key | Action |
-|-----|--------|
-| `a` | Open on Android emulator |
-| `i` | Open on iOS simulator |
-| `w` | Open in browser |
-
 ---
 
-## 📂 Project structure
+## 📂 Project Structure
 
 ```
-hackathon/
-├── app/                        # Expo Router pages (file-based routing)
-│   ├── (tabs)/                 # Bottom tab screens
-│   │   ├── index.tsx           # Home
-│   │   ├── waves.tsx           # Waves (club reels feed)
-│   │   ├── explore.tsx         # Explore (events + clubs)
-│   │   ├── food.tsx            # Food ordering
-│   │   └── calendar.tsx        # Event calendar
-│   ├── event/[id].tsx          # Event detail page
-│   ├── club/[id].tsx           # Club profile page
-│   ├── coding-challenge.tsx    # Daily coding challenge
-│   ├── teachers.tsx            # Faculty directory
-│   ├── campus-map.tsx          # Campus map
-│   ├── print.tsx               # Print shop
-│   ├── order-tracking.tsx      # Food order tracker
-│   ├── grades.tsx              # Grades
-│   ├── attendance.tsx          # Attendance
-│   └── profile.tsx             # User profile
-│
+freshR/
+├── app/                        # Expo Router pages (Routes)
+│   ├── (tabs)/                 # Bottom tab navigation screens
+│   ├── cart/                   # Food checkout flow
+│   ├── club/                   # Club profiles [id]
+│   ├── event/                  # Event details [id]
+│   └── ...                     # Feature-specific screens (attendance, map, etc.)
 ├── src/
-│   ├── components/             # Shared UI components
-│   ├── data/                   # Static seed data (events, food, academics, clubs…)
-│   ├── store/                  # Zustand stores
-│   │   ├── hybridStore.ts      # Core app state (events, clubs, feed ranking)
-│   │   ├── cartStore.ts        # Food cart state
-│   │   └── userStore.ts        # User / session state
-│   └── theme/                  # Design tokens (Colors, Typography, Spacing, Shadows)
-│
-├── assets/                     # Icons, images, splash screen
-├── app.json                    # Expo config (package: com.yugaaank.freshr)
-└── eas.json                    # EAS Build profiles
+│   ├── components/             # Reusable UI components & Layouts
+│   ├── hooks/                  # Custom React hooks (useEvents, useFood, etc.)
+│   ├── lib/
+│   │   ├── db/                 # Supabase data access layers
+│   │   ├── types/              # Database & Application types
+│   │   └── supabase.ts         # Supabase client configuration
+│   ├── store/                  # Zustand stores (Global state management)
+│   └── theme/                  # Design system tokens (Colors, Typography)
+├── supabase/                   # Database migrations, schema, and seed data
+├── assets/                     # Static assets (images, fonts, icons)
+└── ...                         # Configuration files (metro, babel, tsconfig)
 ```
 
 ---
 
-## 🏗 Building for production
+## 🏗 Database Management
 
-```bash
-# Android APK / AAB
-eas build --platform android
+The project uses Supabase for its backend. You can find the schema and seed data in the `supabase/` directory.
 
-# iOS IPA
-eas build --platform ios
+- `schema.sql`: Core table definitions and RLS policies.
+- `seed.sql`: Initial data for clubs, events, and landmarks.
 
-# Both
-eas build --platform all
-```
-
-Make sure you're logged in with `eas login` and have configured the right credentials.
+To apply changes, use the Supabase SQL Editor or CLI.
 
 ---
 
-## 🎨 Design system
+## 🎨 Design Philosophy
 
-All design tokens live in `src/theme/index.ts`:
-
-- **Colors** — primary (`#FF6B35` orange), surface, text hierarchy, semantic colours
-- **Typography** — Sora-based scale: `display`, `h1–h5`, `body1/2`, `caption`, `micro`, `label`
-- **Spacing** — `xs` → `xxxl` uniform spacing scale
-- **Radius** — `sm`, `md`, `lg`, `xl`, `xxl`, `pill`
-- **Shadows** — `sm`, `md`, `colored(hex)`
+freshr follows a high-contrast, modern aesthetic:
+- **Primary Accent**: `#FF6B35` (Fresh Orange)
+- **Typography**: Sora for headings (bold, modern) and DM Sans for body text (legibility).
+- **Interactions**: Haptic feedback on interactions and fluid spring animations for layout transitions.
 
 ---
 
 ## 🤝 Contributing
 
-This was built as a hackathon project. PRs and issues are welcome!
-
-1. Fork the repo
-2. Create a feature branch: `git checkout -b feat/my-feature`
-3. Commit your changes: `git commit -m 'feat: add my feature'`
-4. Push and open a PR
+1. Fork the Project
+2. Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your Changes (`git commit -m 'feat: add some amazing feature'`)
+4. Push to the Branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
 
 ---
 
 ## 📄 License
 
-MIT — feel free to use, fork, and build on it.
+Distributed under the MIT License. See `LICENSE` for more information.
